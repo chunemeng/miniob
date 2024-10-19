@@ -149,15 +149,18 @@ RC Table::drop(const char *meta_file)
     return rc;
   }
 
+  data_buffer_pool_ = nullptr;
+
   delete record_handler_;
+  record_handler_ = nullptr;
 
   for (Index *index : indexes_) {
     index->drop();
     delete index;
   }
+  indexes_.clear();
 
-
-  LOG_INFO("Successfully drop table %s:%s", meta_file);
+  LOG_INFO("Successfully drop table:%s", meta_file);
   return rc;
 }
 

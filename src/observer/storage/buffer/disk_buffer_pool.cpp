@@ -314,6 +314,7 @@ RC DiskBufferPool::close_file()
 
 RC DiskBufferPool::remove_file()
 {
+  LOG_INFO("Begin to remove file %s  %p.", file_name_.c_str(), this);
   bp_manager_.remove_file(file_name_.c_str());
   return RC::SUCCESS;
 }
@@ -845,8 +846,15 @@ RC BufferPoolManager::create_file(const char *file_name)
 
 RC BufferPoolManager::remove_file(const char *file_name)
 {
-  if (close_file(file_name) != RC::SUCCESS || ::remove(file_name) != 0) {
-    LOG_ERROR("Failed to close file %s.", file_name);
+  // close_file will free buffer_pool that owns file_name.
+  std::string file_name_str(file_name);
+  if (close_file(file_name_str.c_str()) != RC::SUCCESS) {
+    LOG_ERROR("Failed to close file %s.", file_name_str.c_str());
+    return RC::INTERNAL;
+  }
+
+  if ((::remove(file_name_str.c_str())) != 0) {
+    LOG_INFO("Failed to remove file %s %d.", file_name_str.c_str(), 0);
     return RC::INTERNAL;
   }
   return RC::SUCCESS;
@@ -900,6 +908,7 @@ RC BufferPoolManager::close_file(const char *_file_name)
   buffer_pools_.erase(iter);
   lock_.unlock();
 
+  LOG_INFO("close file %s, bp ptr is %p", _file_name, bp);
   delete bp;
   return RC::SUCCESS;
 }
