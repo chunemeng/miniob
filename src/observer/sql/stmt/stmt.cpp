@@ -20,6 +20,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/delete_stmt.h"
 #include "sql/stmt/desc_table_stmt.h"
 #include "sql/stmt/exit_stmt.h"
+#include "sql/stmt/drop_table_stmt.h"
 #include "sql/stmt/explain_stmt.h"
 #include "sql/stmt/help_stmt.h"
 #include "sql/stmt/insert_stmt.h"
