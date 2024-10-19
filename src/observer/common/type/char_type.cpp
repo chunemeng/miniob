@@ -12,6 +12,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/log/log.h"
 #include "common/type/char_type.h"
 #include "common/value.h"
+#include "common/time/datetime.h"
 
 int CharType::compare(const Value &left, const Value &right) const
 {
@@ -29,6 +30,18 @@ RC CharType::set_value_from_str(Value &val, const string &data) const
 RC CharType::cast_to(const Value &val, AttrType type, Value &result) const
 {
   switch (type) {
+    case AttrType::DATES:
+      int y, m, d;
+      if (sscanf(val.value_.pointer_value_, "%d-%d-%d", &y, &m, &d) != 3) {
+        LOG_WARN("invalid date format", val.value_.pointer_value_);
+        return RC::INVALID_ARGUMENT;
+      }
+      if (!common::check_date(y, m, d)) {
+        LOG_WARN("invalid date value", val.value_.pointer_value_);
+        return RC::INVALID_ARGUMENT;
+      }
+      result.set_date(y, m, d);
+      break;
     default: return RC::UNIMPLEMENTED;
   }
   return RC::SUCCESS;
@@ -36,10 +49,11 @@ RC CharType::cast_to(const Value &val, AttrType type, Value &result) const
 
 int CharType::cast_cost(AttrType type)
 {
-  if (type == AttrType::CHARS) {
-    return 0;
+  switch (type) {
+    case AttrType::CHARS: return 0;
+    case AttrType::DATES: return 1;
+    default: return INT32_MAX;
   }
-  return INT32_MAX;
 }
 
 RC CharType::to_string(const Value &val, string &result) const

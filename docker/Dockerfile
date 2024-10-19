@@ -18,9 +18,11 @@ RUN apt-get update \
 # install openssh
 RUN apt-get install -y openssh-server
 
+COPY .. /tmp/miniob
+
 # init miniob dependencies
-RUN git clone https://github.com/oceanbase/miniob /tmp/miniob \
-    && cd /tmp/miniob \
+RUN cd /tmp/miniob \
+    && sed -i 's/\r$//' build.sh \
     && bash build.sh init \
     && rm -rf /tmp/miniob
 

@@ -431,4 +431,5 @@ public:
   static string unique();
 };
 
+bool check_date(int year, int month, int day);
 }  // namespace common
