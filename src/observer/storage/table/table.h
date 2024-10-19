@@ -62,6 +62,12 @@ public:
   RC open(Db *db, const char *meta_file, const char *base_dir);
 
   /**
+   * 删除一个表
+   * @param meta_file 保存表元数据的文件完整路径
+   */
+  RC drop(const char *meta_file);
+
+  /**
    * @brief 根据给定的字段生成一个记录/行
    * @details 通常是由用户传过来的字段，按照schema信息组装成一个record。
    * @param value_num 字段的个数

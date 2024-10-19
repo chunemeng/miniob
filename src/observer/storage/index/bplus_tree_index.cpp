@@ -55,7 +55,7 @@ RC BplusTreeIndex::open(Table *table, const char *file_name, const IndexMeta &in
   Index::init(index_meta, field_meta);
 
   BufferPoolManager &bpm = table->db()->buffer_pool_manager();
-  RC rc = index_handler_.open(table->db()->log_handler(), bpm, file_name);
+  RC                 rc  = index_handler_.open(table->db()->log_handler(), bpm, file_name);
   if (RC::SUCCESS != rc) {
     LOG_WARN("Failed to open index_handler, file_name:%s, index:%s, field:%s, rc:%s",
         file_name, index_meta.name(), index_meta.field(), strrc(rc));
@@ -77,6 +77,23 @@ RC BplusTreeIndex::close()
     inited_ = false;
   }
   LOG_INFO("Successfully close index.");
+  return RC::SUCCESS;
+}
+
+RC BplusTreeIndex::drop()
+{
+  if (!inited_) {
+    LOG_WARN("Failed to drop index due to the index has not been initedd. index:%s, field:%s",
+        index_meta_.name(), index_meta_.field());
+    // FIXME: should we return RC::RECORD_INVISIBLE?
+    return RC::RECORD_INVISIBLE;
+  }
+  RC rc = index_handler_.drop();
+  if ((rc) != RC::SUCCESS) {
+    LOG_WARN("Failed to drop index.");
+    return rc;
+  }
+  LOG_INFO("Successfully drop index.");
   return RC::SUCCESS;
 }
 

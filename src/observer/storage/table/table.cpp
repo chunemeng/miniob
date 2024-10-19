@@ -127,6 +127,40 @@ RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, c
   return rc;
 }
 
+RC Table::drop(const char *meta_file)
+{
+  if (common::is_blank(meta_file)) {
+    LOG_WARN("Invalid arguments. meta_file=%s", meta_file);
+    return RC::INVALID_ARGUMENT;
+  }
+
+  RC rc = RC::SUCCESS;
+  // 删除表文件
+  if (remove(meta_file) != 0) {
+    LOG_ERROR("Failed to remove table file. file name=%s, errmsg=%s", meta_file, strerror(errno));
+    return RC::INTERNAL;
+  }
+
+  string             data_file = table_data_file(base_dir_.c_str(), table_meta_.name());
+  BufferPoolManager &bpm       = db()->buffer_pool_manager();
+  rc                           = bpm.remove_file(data_file.c_str());
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to create disk buffer pool of data file. file name=%s", data_file.c_str());
+    return rc;
+  }
+
+  delete record_handler_;
+
+  for (Index *index : indexes_) {
+    index->drop();
+    delete index;
+  }
+
+
+  LOG_INFO("Successfully drop table %s:%s", meta_file);
+  return rc;
+}
+
 RC Table::open(Db *db, const char *meta_file, const char *base_dir)
 {
   // 加载元数据文件
@@ -272,7 +306,7 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
 
   for (int i = 0; i < value_num && OB_SUCC(rc); i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
-    const Value &    value = values[i];
+    const Value     &value = values[i];
     if (field->type() != value.attr_type()) {
       Value real_value;
       rc = Value::cast_to(value, field->type(), real_value);
