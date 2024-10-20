@@ -435,7 +435,7 @@ RC ArithmeticExpr::get_value(const Tuple &tuple, Value &value) const
 
   rc = left_->get_value(tuple, left_value);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to get value of left expression. rc=%s", strrc(rc));
+    LOG_WARN("failed to get value of left expression. rc=%s type:%d", strrc(rc),left_->type());
     return rc;
   }
   rc = right_->get_value(tuple, right_value);

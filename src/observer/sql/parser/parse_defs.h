@@ -66,6 +66,20 @@ enum CompOp
  */
 struct ConditionSqlNode
 {
+  Expression *left_;   ///< left-hand side expression
+  CompOp      comp;    ///< comparison operator
+  Expression *right_;  ///< right-hand side expression
+};
+
+/**
+ * @brief 表示一个条件比较，支持表达式
+ * @ingroup SQLParser
+ * @details 条件比较就是SQL查询中的 where a>b 这种。
+ * 一个条件比较是有两部分组成的，称为左边和右边。
+ * 左边和右边理论上都可以是任意的数据，比如是字段（属性，列），也可以是数值常量。
+ * 这个结构中记录的仅仅支持字段和值。
+ */
+struct OLD_ConditionNode {
   int left_is_attr;              ///< TRUE if left-hand side is an attribute
                                  ///< 1时，操作符左边是属性名，0时，是属性值
   Value          left_value;     ///< left-hand side value if left_is_attr = FALSE

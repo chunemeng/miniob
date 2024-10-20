@@ -55,7 +55,7 @@ RC DefaultConditionFilter::init(const ConDesc &left, const ConDesc &right, AttrT
   return RC::SUCCESS;
 }
 
-RC DefaultConditionFilter::init(Table &table, const ConditionSqlNode &condition)
+RC DefaultConditionFilter::init(Table &table, const OLD_ConditionNode &condition)
 {
   const TableMeta &table_meta = table.table_meta();
   ConDesc          left;
@@ -173,7 +173,7 @@ RC CompositeConditionFilter::init(const ConditionFilter *filters[], int filter_n
   return init(filters, filter_num, false);
 }
 
-RC CompositeConditionFilter::init(Table &table, const ConditionSqlNode *conditions, int condition_num)
+RC CompositeConditionFilter::init(Table &table, const OLD_ConditionNode *conditions, int condition_num)
 {
   if (condition_num == 0) {
     return RC::SUCCESS;
