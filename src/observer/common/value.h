@@ -96,6 +96,8 @@ public:
 
   int compare(const Value &other) const;
 
+  int compare_like(const Value &other) const;
+
   const char *data() const;
 
   int      length() const { return length_; }

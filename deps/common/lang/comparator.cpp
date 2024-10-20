@@ -13,6 +13,7 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "common/defs.h"
+#include <regex>
 #include <string.h>
 
 #include "common/lang/algorithm.h"
@@ -64,6 +65,37 @@ int compare_string(void *arg1, int arg1_max_length, void *arg2, int arg2_max_len
     return -1;
   }
   return 0;
+}
+
+int compare_string_like(void *arg1, int arg1_max_length, void *arg2, int arg2_max_length)
+{
+  const char *s2 = (const char *)arg2;
+
+  // Convert the SQL LIKE pattern to a regex pattern
+  std::string pattern(s2, arg2_max_length);
+  std::string regex_pattern;
+  regex_pattern.reserve(pattern.size());
+  regex_pattern += "^";
+
+  for (char c : pattern) {
+    if (c == '%') {
+      regex_pattern += "[^']*";
+    } else if (c == '_') {
+      regex_pattern += "[^']";
+    } else {
+      regex_pattern += std::regex_replace(std::string(1, c), std::regex(R"([\^$.|?*+(){}\\])"), R"(\\$&)");
+    }
+  }
+  regex_pattern += "$";
+
+  std::regex  re(regex_pattern);
+  std::string str((const char *)arg1, arg1_max_length);
+
+  if (std::regex_match(str, re)) {
+    return 0;
+  } else {
+    return -1;
+  }
 }
 
 }  // namespace common

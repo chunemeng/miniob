@@ -246,6 +246,13 @@ int Value::compare(const Value &other) const
   return DataType::type_instance(this->attr_type_)->compare(*this, other);
 }
 
+int Value::compare_like(const Value &other) const
+{
+  ASSERT(this->attr_type_ == AttrType::CHARS && other.attr_type() == AttrType::CHARS, "invalid type in like");
+  return common::compare_string_like(
+      (void *)this->value_.pointer_value_, this->length_, (void *)other.value_.pointer_value_, other.length_);
+}
+
 int Value::get_int() const
 {
   switch (attr_type_) {
