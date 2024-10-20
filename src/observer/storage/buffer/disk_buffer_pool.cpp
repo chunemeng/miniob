@@ -908,7 +908,6 @@ RC BufferPoolManager::close_file(const char *_file_name)
   buffer_pools_.erase(iter);
   lock_.unlock();
 
-  LOG_INFO("close file %s, bp ptr is %p", _file_name, bp);
   delete bp;
   return RC::SUCCESS;
 }

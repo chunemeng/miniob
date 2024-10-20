@@ -247,6 +247,53 @@ RC Table::insert_record(Record &record)
   return rc;
 }
 
+RC Table::update_record(Record &record, const FieldMeta *field_meta, Value *values, int value_num)
+{
+  RC rc = RC::SUCCESS;
+
+  auto data = new char[table_meta_.record_size()];
+  memcpy(data, record.data(), table_meta_.record_size());
+
+  for (int i = 0; i < value_num && OB_SUCC(rc); i++) {
+    const FieldMeta *field = field_meta;
+    const Value     &value = values[i];
+    if (field->type() != value.attr_type()) {
+      Value real_value;
+      rc = Value::cast_to(value, field->type(), real_value);
+      if (OB_FAIL(rc)) {
+        LOG_WARN("failed to cast value. table name:%s,field name:%s,value:%s ",
+            table_meta_.name(), field->name(), value.to_string().c_str());
+        break;
+      }
+      rc = set_value_to_record(data, real_value, field);
+    } else {
+      rc = set_value_to_record(data, value, field);
+    }
+  }
+  Record new_record;
+  new_record.set_data(data, table_meta_.record_size());
+  new_record.set_rid(record.rid());
+
+  if (OB_FAIL(rc)) {
+    LOG_WARN("failed to update record. table name:%s", table_meta_.name());
+    return rc;
+  }
+
+  RC rc2 = delete_record(record);
+  if (rc2 != RC::SUCCESS) {
+    LOG_ERROR("Failed to rollback index data when insert index entries failed. table name=%s, rc=%d:%s",
+                name(), rc2, strrc(rc2));
+  }
+
+  rc2 = insert_record(new_record);
+  if (rc2 != RC::SUCCESS) {
+    LOG_PANIC("Failed to rollback record data when insert index entries failed. table name=%s, rc=%d:%s",
+                name(), rc2, strrc(rc2));
+  }
+
+  return rc;
+}
+
 RC Table::visit_record(const RID &rid, function<bool(Record &)> visitor)
 {
   return record_handler_->visit_record(rid, visitor);
