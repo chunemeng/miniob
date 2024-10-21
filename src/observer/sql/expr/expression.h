@@ -326,6 +326,14 @@ static RC init_expr(
   return rc;
 }
 
+static int implicit_cast_cost(AttrType from, AttrType to)
+{
+  if (from == to) {
+    return 0;
+  }
+  return DataType::type_instance(from)->cast_cost(to);
+}
+
 /**
  * @brief 比较表达式
  * @ingroup Expression
@@ -341,7 +349,7 @@ public:
     if (left_ == nullptr || right_ == nullptr) {
       return RC::INTERNAL;
     }
-    RC rc = init_expr(db, default_table, tables, left_);
+    RC       rc = init_expr(db, default_table, tables, left_);
 
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to init left expr in comp");
@@ -350,9 +358,49 @@ public:
 
     rc = init_expr(db, default_table, tables, right_);
 
+    AttrType left_attr_type  = left_->value_type();
+    AttrType right_attr_type = right_->value_type();
+
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to init left expr in comp");
       return rc;
+    }
+
+    if (left_attr_type != right_attr_type) {
+      auto left_to_right_cost = implicit_cast_cost(left_attr_type, right_attr_type);
+      auto right_to_left_cost = implicit_cast_cost(right_attr_type, left_attr_type);
+      if (left_to_right_cost <= right_to_left_cost && left_to_right_cost != INT32_MAX) {
+        ExprType left_type = left_->type();
+        auto     cast_expr = make_unique<CastExpr>(std::move(left_), right_attr_type);
+        if (left_type == ExprType::VALUE) {
+          Value left_val;
+          if (OB_FAIL(rc = cast_expr->try_get_value(left_val))) {
+            LOG_WARN("failed to get value from left child", strrc(rc));
+            return rc;
+          }
+          left_ = make_unique<ValueExpr>(left_val);
+        } else {
+          left_ = std::move(cast_expr);
+        }
+      } else if (right_to_left_cost < left_to_right_cost && right_to_left_cost != INT32_MAX) {
+        ExprType right_type = right_->type();
+        auto     cast_expr  = make_unique<CastExpr>(std::move(right_), left_attr_type);
+        if (right_type == ExprType::VALUE) {
+          Value right_val;
+          if (OB_FAIL(rc = cast_expr->try_get_value(right_val))) {
+            LOG_WARN("failed to get value from right child", strrc(rc));
+            return rc;
+          }
+          right_ = make_unique<ValueExpr>(right_val);
+        } else {
+          right_ = std::move(cast_expr);
+        }
+
+      } else {
+        rc = RC::UNSUPPORTED;
+        LOG_WARN("unsupported cast from %s to %s", attr_type_to_string(left_attr_type), attr_type_to_string(right_attr_type));
+        return rc;
+      }
     }
 
     return RC::SUCCESS;
