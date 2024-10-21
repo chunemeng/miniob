@@ -358,13 +358,16 @@ public:
 
     rc = init_expr(db, default_table, tables, right_);
 
-    AttrType left_attr_type  = left_->value_type();
-    AttrType right_attr_type = right_->value_type();
-
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to init left expr in comp");
       return rc;
     }
+
+
+    // FIXME: WE CAN GET TYPE WHEN INIT EXPR
+    AttrType left_attr_type  = left_->value_type();
+    AttrType right_attr_type = right_->value_type();
+
 
     if (left_attr_type != right_attr_type) {
       auto left_to_right_cost = implicit_cast_cost(left_attr_type, right_attr_type);
