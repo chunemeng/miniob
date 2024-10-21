@@ -268,6 +268,46 @@ RC ExpressionBinder::bind_comparison_expression(
     right_expr.reset(right.release());
   }
 
+  AttrType left_attr_type = left_expr->value_type();
+  AttrType right_attr_type = right_expr->value_type();
+
+  if (left_attr_type != right_attr_type) {
+    auto left_to_right_cost = implicit_cast_cost(left_attr_type, right_attr_type);
+    auto right_to_left_cost = implicit_cast_cost(right_attr_type, left_attr_type);
+    if (left_to_right_cost <= right_to_left_cost && left_to_right_cost != INT32_MAX) {
+      ExprType left_type = left_expr->type();
+      auto     cast_expr = make_unique<CastExpr>(std::move(left_expr), right_attr_type);
+      if (left_type == ExprType::VALUE) {
+        Value left_val;
+        if (OB_FAIL(rc = cast_expr->try_get_value(left_val))) {
+          LOG_WARN("failed to get value from left child", strrc(rc));
+          return rc;
+        }
+        left_expr = make_unique<ValueExpr>(left_val);
+      } else {
+        left_expr = std::move(cast_expr);
+      }
+    } else if (right_to_left_cost < left_to_right_cost && right_to_left_cost != INT32_MAX) {
+      ExprType right_type = right_expr->type();
+      auto     cast_expr  = make_unique<CastExpr>(std::move(right_expr), left_attr_type);
+      if (right_type == ExprType::VALUE) {
+        Value right_val;
+        if (OB_FAIL(rc = cast_expr->try_get_value(right_val))) {
+          LOG_WARN("failed to get value from right child", strrc(rc));
+          return rc;
+        }
+        right_expr = make_unique<ValueExpr>(right_val);
+      } else {
+        right_expr = std::move(cast_expr);
+      }
+
+    } else {
+      rc = RC::UNSUPPORTED;
+      LOG_WARN("unsupported cast from %s to %s", attr_type_to_string(left_attr_type), attr_type_to_string(right_attr_type));
+      return rc;
+    }
+  }
+
   bound_expressions.emplace_back(std::move(expr));
   return RC::SUCCESS;
 }
@@ -386,7 +426,7 @@ RC check_aggregate_expression(AggregateExpr &expression)
   }
 
   // 子表达式中不能再包含聚合表达式
-  function<RC(std::unique_ptr<Expression>&)> check_aggregate_expr = [&](unique_ptr<Expression> &expr) -> RC {
+  function<RC(std::unique_ptr<Expression> &)> check_aggregate_expr = [&](unique_ptr<Expression> &expr) -> RC {
     RC rc = RC::SUCCESS;
     if (expr->type() == ExprType::AGGREGATION) {
       LOG_WARN("aggregate expression cannot be nested");
@@ -408,10 +448,10 @@ RC ExpressionBinder::bind_aggregate_expression(
     return RC::SUCCESS;
   }
 
-  auto unbound_aggregate_expr = static_cast<UnboundAggregateExpr *>(expr.get());
-  const char *aggregate_name = unbound_aggregate_expr->aggregate_name();
+  auto                unbound_aggregate_expr = static_cast<UnboundAggregateExpr *>(expr.get());
+  const char         *aggregate_name         = unbound_aggregate_expr->aggregate_name();
   AggregateExpr::Type aggregate_type;
-  RC rc = AggregateExpr::type_from_string(aggregate_name, aggregate_type);
+  RC                  rc = AggregateExpr::type_from_string(aggregate_name, aggregate_type);
   if (OB_FAIL(rc)) {
     LOG_WARN("invalid aggregate name: %s", aggregate_name);
     return rc;

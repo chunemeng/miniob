@@ -17,6 +17,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/log/log.h"
 #include "common/rc.h"
 #include "storage/table/table.h"
+#include "sql/parser/expression_binder.h"
 
 FilterStmt::~FilterStmt()
 {

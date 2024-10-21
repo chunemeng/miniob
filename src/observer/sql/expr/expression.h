@@ -363,11 +363,9 @@ public:
       return rc;
     }
 
-
     // FIXME: WE CAN GET TYPE WHEN INIT EXPR
     AttrType left_attr_type  = left_->value_type();
     AttrType right_attr_type = right_->value_type();
-
 
     if (left_attr_type != right_attr_type) {
       auto left_to_right_cost = implicit_cast_cost(left_attr_type, right_attr_type);
