@@ -510,21 +510,27 @@ public:
 
   RC init(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables) override
   {
-    RC rc = init_expr(db, default_table, tables, left_);
+    RC rc = RC::SUCCESS;
 
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to init left expr in arithmetic");
-      return rc;
+    if (left_ != nullptr) {
+      rc = init_expr(db, default_table, tables, left_);
+
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("failed to init left expr in arithmetic");
+        return rc;
+      }
     }
 
-    rc = init_expr(db, default_table, tables, right_);
+    if (right_ != nullptr) {
+      rc = init_expr(db, default_table, tables, right_);
 
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to init left expr in arithmetic");
-      return rc;
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("failed to init left expr in arithmetic");
+        return rc;
+      }
     }
 
-    return RC::SUCCESS;
+    return rc;
   }
 
   bool     equal(const Expression &other) const override;
