@@ -30,20 +30,12 @@ public:
   FilterUnit() = default;
   ~FilterUnit() {}
 
-  void set_comp(CompOp comp) { comp_ = comp; }
+  void set_condition(Expression *obj) { condition_.reset(obj); }
 
-  CompOp comp() const { return comp_; }
-
-  void set_left(Expression *obj) { left_.reset(obj); }
-  void set_right(Expression *obj) { right_.reset(obj); }
-
-  std::unique_ptr<Expression> get_left() { return std::move(left_); }
-  std::unique_ptr<Expression> get_right() { return std::move(right_); }
+  std::unique_ptr<Expression> get_condition() { return std::move(condition_); }
 
 private:
-  CompOp                      comp_ = NO_OP;
-  std::unique_ptr<Expression> left_;
-  std::unique_ptr<Expression> right_;
+  std::unique_ptr<Expression> condition_;
 };
 
 /**

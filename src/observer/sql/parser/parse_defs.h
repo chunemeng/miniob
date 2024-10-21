@@ -66,9 +66,7 @@ enum CompOp
  */
 struct ConditionSqlNode
 {
-  Expression *left_;   ///< left-hand side expression
-  CompOp      comp;    ///< comparison operator
-  Expression *right_;  ///< right-hand side expression
+  Expression *condition;  ///< left-hand side expression
 };
 
 /**
@@ -79,7 +77,8 @@ struct ConditionSqlNode
  * 左边和右边理论上都可以是任意的数据，比如是字段（属性，列），也可以是数值常量。
  * 这个结构中记录的仅仅支持字段和值。
  */
-struct OLD_ConditionNode {
+struct OLD_ConditionNode
+{
   int left_is_attr;              ///< TRUE if left-hand side is an attribute
                                  ///< 1时，操作符左边是属性名，0时，是属性值
   Value          left_value;     ///< left-hand side value if left_is_attr = FALSE
@@ -162,6 +161,7 @@ struct AttrInfoSqlNode
   AttrType    type;    ///< Type of attribute
   std::string name;    ///< Attribute name
   size_t      length;  ///< Length of attribute
+  bool        nullable = true;
 };
 
 /**

@@ -18,6 +18,7 @@ See the Mulan PSL v2 for more details. */
 #include <string>
 
 #include "common/value.h"
+#include "storage/db/db.h"
 #include "storage/field/field.h"
 #include "sql/expr/aggregator.h"
 #include "storage/common/chunk.h"
@@ -68,6 +69,10 @@ public:
   Expression()          = default;
   virtual ~Expression() = default;
 
+  virtual RC init(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables)
+  {
+    return RC::SUCCESS;
+  };
   /**
    * @brief 判断两个表达式是否相等
    */
@@ -175,6 +180,34 @@ private:
   std::string field_name_;
 };
 
+static RC get_table_and_field(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
+    UnboundFieldExpr *expr, Table *&table, const FieldMeta *&field)
+{
+  if (common::is_blank(expr->table_name())) {
+    table = default_table;
+  } else if (nullptr != tables) {
+    auto iter = tables->find(expr->table_name());
+    if (iter != tables->end()) {
+      table = iter->second;
+    }
+  } else {
+    table = db->find_table(expr->table_name());
+  }
+  if (nullptr == table) {
+    LOG_WARN("No such table: attr.relation_name: %s", expr->table_name());
+    return RC::SCHEMA_TABLE_NOT_EXIST;
+  }
+
+  field = table->table_meta().field(expr->field_name());
+  if (nullptr == field) {
+    LOG_WARN("no such field in table: table %s, field %s", table->name(), expr->field_name());
+    table = nullptr;
+    return RC::SCHEMA_FIELD_NOT_EXIST;
+  }
+
+  return RC::SUCCESS;
+}
+
 /**
  * @brief 字段表达式
  * @ingroup Expression
@@ -270,6 +303,29 @@ private:
   AttrType                    cast_type_;  ///< 想要转换成这个类型
 };
 
+static RC init_expr(
+    Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables, std::unique_ptr<Expression> &left_)
+{
+  RC rc = RC::SUCCESS;
+  if (left_->type() == ExprType::UNBOUND_FIELD) {
+    auto             field_expr = dynamic_cast<UnboundFieldExpr *>(left_.release());
+    Table           *table      = nullptr;
+    const FieldMeta *field      = nullptr;
+    rc                          = get_table_and_field(db, default_table, tables, field_expr, table, field);
+    if (rc != RC::SUCCESS) {
+      left_.reset(field_expr);
+      LOG_WARN("cannot find attr");
+      return rc;
+    }
+    left_ = std::make_unique<FieldExpr>(table, field);
+    delete field_expr;
+  } else {
+    rc = left_->init(db, default_table, tables);
+  }
+
+  return rc;
+}
+
 /**
  * @brief 比较表达式
  * @ingroup Expression
@@ -277,8 +333,30 @@ private:
 class ComparisonExpr : public Expression
 {
 public:
+  ComparisonExpr(CompOp comp, Expression *left, Expression *right);
   ComparisonExpr(CompOp comp, std::unique_ptr<Expression> left, std::unique_ptr<Expression> right);
   virtual ~ComparisonExpr();
+  RC init(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables) override
+  {
+    if (left_ == nullptr || right_ == nullptr) {
+      return RC::INTERNAL;
+    }
+    RC rc = init_expr(db, default_table, tables, left_);
+
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to init left expr in comp");
+      return rc;
+    }
+
+    rc = init_expr(db, default_table, tables, right_);
+
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to init left expr in comp");
+      return rc;
+    }
+
+    return RC::SUCCESS;
+  }
 
   ExprType type() const override { return ExprType::COMPARISON; }
   RC       get_value(const Tuple &tuple, Value &value) const override;
@@ -334,6 +412,17 @@ public:
   ConjunctionExpr(Type type, std::vector<std::unique_ptr<Expression>> &children);
   virtual ~ConjunctionExpr() = default;
 
+  RC init(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables) override
+  {
+    for (auto &child : children_) {
+      RC rc = init_expr(db, default_table, tables, child);
+      if (rc != RC::SUCCESS) {
+        return rc;
+      }
+    }
+    return RC::SUCCESS;
+  }
+
   ExprType type() const override { return ExprType::CONJUNCTION; }
   AttrType value_type() const override { return AttrType::BOOLEANS; }
   RC       get_value(const Tuple &tuple, Value &value) const override;
@@ -367,6 +456,25 @@ public:
   ArithmeticExpr(Type type, Expression *left, Expression *right);
   ArithmeticExpr(Type type, std::unique_ptr<Expression> left, std::unique_ptr<Expression> right);
   virtual ~ArithmeticExpr() = default;
+
+  RC init(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables) override
+  {
+    RC rc = init_expr(db, default_table, tables, left_);
+
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to init left expr in arithmetic");
+      return rc;
+    }
+
+    rc = init_expr(db, default_table, tables, right_);
+
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to init left expr in arithmetic");
+      return rc;
+    }
+
+    return RC::SUCCESS;
+  }
 
   bool     equal(const Expression &other) const override;
   ExprType type() const override { return ExprType::ARITHMETIC; }

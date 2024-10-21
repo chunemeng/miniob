@@ -159,10 +159,10 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
   RC                                  rc = RC::SUCCESS;
   std::vector<unique_ptr<Expression>> cmp_exprs;
   const std::vector<FilterUnit *>    &filter_units = filter_stmt->filter_units();
+  cmp_exprs.reserve(filter_units.size());
+
   for (FilterUnit *filter_unit : filter_units) {
-    ComparisonExpr *cmp_expr =
-        new ComparisonExpr(filter_unit->comp(), filter_unit->get_left(), filter_unit->get_right());
-    cmp_exprs.emplace_back(cmp_expr);
+    cmp_exprs.emplace_back(filter_unit->get_condition());
   }
 
   unique_ptr<PredicateLogicalOperator> predicate_oper;

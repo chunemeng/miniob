@@ -16,7 +16,6 @@ See the Mulan PSL v2 for more details. */
 #include "common/lang/string.h"
 #include "common/log/log.h"
 #include "common/rc.h"
-#include "storage/db/db.h"
 #include "storage/table/table.h"
 
 FilterStmt::~FilterStmt()
@@ -50,51 +49,22 @@ RC FilterStmt::create(Db *db, Table *default_table, std::unordered_map<std::stri
   return rc;
 }
 
-RC get_table_and_field(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
-    const RelAttrSqlNode &attr, Table *&table, const FieldMeta *&field)
-{
-  if (common::is_blank(attr.relation_name.c_str())) {
-    table = default_table;
-  } else if (nullptr != tables) {
-    auto iter = tables->find(attr.relation_name);
-    if (iter != tables->end()) {
-      table = iter->second;
-    }
-  } else {
-    table = db->find_table(attr.relation_name.c_str());
-  }
-  if (nullptr == table) {
-    LOG_WARN("No such table: attr.relation_name: %s", attr.relation_name.c_str());
-    return RC::SCHEMA_TABLE_NOT_EXIST;
-  }
-
-  field = table->table_meta().field(attr.attribute_name.c_str());
-  if (nullptr == field) {
-    LOG_WARN("no such field in table: table %s, field %s", table->name(), attr.attribute_name.c_str());
-    table = nullptr;
-    return RC::SCHEMA_FIELD_NOT_EXIST;
-  }
-
-  return RC::SUCCESS;
-}
-
 RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
     const ConditionSqlNode &condition, FilterUnit *&filter_unit)
 {
   RC rc = RC::SUCCESS;
 
-  CompOp comp = condition.comp;
-  if (comp < EQUAL_TO || comp >= NO_OP) {
-    LOG_WARN("invalid compare operator : %d", comp);
-    return RC::INVALID_ARGUMENT;
-  }
-
   filter_unit = new FilterUnit;
 
-  filter_unit->set_left(condition.left_);
-  filter_unit->set_right(condition.right_);
+  rc = condition.condition->init(db, default_table, tables);
 
-  filter_unit->set_comp(comp);
+  if (rc != RC::SUCCESS) {
+    delete filter_unit;
+    LOG_WARN("failed to init condition in filter unit");
+    return rc;
+  }
+
+  filter_unit->set_condition(condition.condition);
 
   // 检查两个类型是否能够比较
   return rc;

@@ -30,6 +30,17 @@ int yyerror(YYLTYPE *llocp, const char *sql_string, ParsedSqlResult *sql_result,
   return 0;
 }
 
+ComparisonExpr *create_comparison_expression(CompOp op,
+                                             Expression *left,
+                                             Expression *right,
+                                             const char *sql_string,
+                                             YYLTYPE *llocp)
+{
+  ComparisonExpr *expr = new ComparisonExpr(op, left, right);
+  expr->set_name(token_name(sql_string, llocp));
+  return expr;
+}
+
 ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
                                              Expression *left,
                                              Expression *right,
@@ -109,6 +120,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         EXPLAIN
         STORAGE
         FORMAT
+        NULL_T
+        NULLABLE
         EQ
         LT
         GT
@@ -354,6 +367,23 @@ attr_def:
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->length = 4;
+      free($1);
+    }
+    | ID type NULLABLE
+    {
+      $$ = new AttrInfoSqlNode;
+      $$->type = (AttrType)$2;
+      $$->name = $1;
+      $$->length = 4;
+      free($1);
+    }
+    | ID type NOT NULL_T
+    {
+      $$ = new AttrInfoSqlNode;
+      $$->type = (AttrType)$2;
+      $$->name = $1;
+      $$->length = 4;
+      $$->nullable = false;
       free($1);
     }
     ;
@@ -606,9 +636,7 @@ condition:
     expression comp_op expression
     {
       $$ = new ConditionSqlNode;
-      $$->left_ = $1;
-      $$->right_ = $3;
-      $$->comp = $2;
+      $$->condition = create_comparison_expression($2, $1, $3, sql_string, &@$);
     }
     ;
 
