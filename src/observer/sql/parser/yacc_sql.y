@@ -120,8 +120,9 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         EXPLAIN
         STORAGE
         FORMAT
+        INNER
+        JOIN
         NULL_T
-        NULLABLE
         EQ
         LT
         GT
@@ -160,6 +161,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <condition>           condition
 %type <value>               value
 %type <number>              number
+%type <number>              null_t
 %type <string>              relation
 %type <comp>                comp_op
 %type <rel_attr>            rel_attr
@@ -353,7 +355,7 @@ attr_def_list:
     ;
     
 attr_def:
-    ID type LBRACE number RBRACE 
+    ID type LBRACE number RBRACE null_t
     {
       $$ = new AttrInfoSqlNode;
       $$->type = (AttrType)$2;
@@ -361,23 +363,7 @@ attr_def:
       $$->length = $4;
       free($1);
     }
-    | ID type
-    {
-      $$ = new AttrInfoSqlNode;
-      $$->type = (AttrType)$2;
-      $$->name = $1;
-      $$->length = 4;
-      free($1);
-    }
-    | ID type NULLABLE
-    {
-      $$ = new AttrInfoSqlNode;
-      $$->type = (AttrType)$2;
-      $$->name = $1;
-      $$->length = 4;
-      free($1);
-    }
-    | ID type NOT NULL_T
+    | ID type null_t
     {
       $$ = new AttrInfoSqlNode;
       $$->type = (AttrType)$2;
@@ -390,6 +376,21 @@ attr_def:
 number:
     NUMBER {$$ = $1;}
     ;
+null_t:
+    /* empty */
+    {
+      $$ = 1;
+    }
+    | NULL_T
+    {
+      $$ = 1;
+    }
+    | NOT NULL_T
+    {
+      $$ = 0;
+    }
+    ;
+
 type:
     INT_T      { $$ = static_cast<int>(AttrType::INTS); }
     | STRING_T { $$ = static_cast<int>(AttrType::CHARS); }
