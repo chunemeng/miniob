@@ -50,7 +50,6 @@ RC ExpressionIterator::iterate_child_expr(Expression &expr, function<RC(unique_p
     } break;
 
     case ExprType::ARITHMETIC: {
-
       auto &arithmetic_expr = static_cast<ArithmeticExpr &>(expr);
       rc = callback(arithmetic_expr.left());
       if (OB_SUCC(rc)) {

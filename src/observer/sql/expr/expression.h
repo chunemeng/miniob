@@ -356,6 +356,8 @@ public:
       return rc;
     }
 
+    AttrType left_attr_type  = left_->value_type();
+
     rc = init_expr(db, default_table, tables, right_);
 
     if (rc != RC::SUCCESS) {
@@ -364,7 +366,6 @@ public:
     }
 
     // FIXME: WE CAN GET TYPE WHEN INIT EXPR
-    AttrType left_attr_type  = left_->value_type();
     AttrType right_attr_type = right_->value_type();
 
     if (left_attr_type != right_attr_type) {

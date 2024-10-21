@@ -41,8 +41,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   BinderContext binder_context;
 
   // collect tables in `from` statement
-  vector<Table *>                tables;
-  unordered_map<string, Table *> table_map;
+  vector<Table *> tables;
   for (size_t i = 0; i < select_sql.relations.size(); i++) {
     const char *table_name = select_sql.relations[i].c_str();
     if (nullptr == table_name) {
@@ -56,14 +55,13 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
 
-    binder_context.add_table(table);
-    tables.push_back(table);
-    table_map.insert({table_name, table});
+    binder_context.add_table(table_name, table);
   }
 
   // collect query fields in `select` statement
   vector<unique_ptr<Expression>> bound_expressions;
   ExpressionBinder               expression_binder(binder_context);
+
   for (unique_ptr<Expression> &expression : select_sql.expressions) {
     RC rc = expression_binder.bind_expression(expression, bound_expressions);
     if (OB_FAIL(rc)) {
@@ -81,19 +79,10 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     }
   }
 
-  Table *default_table = nullptr;
-  if (tables.size() == 1) {
-    default_table = tables[0];
-  }
-
   // create filter statement in `where` statement
   FilterStmt *filter_stmt = nullptr;
-  RC          rc          = FilterStmt::create(db,
-      default_table,
-      &table_map,
-      select_sql.conditions.data(),
-      static_cast<int>(select_sql.conditions.size()),
-      filter_stmt);
+  RC          rc          = FilterStmt::create(
+      expression_binder, select_sql.conditions.data(), static_cast<int>(select_sql.conditions.size()), filter_stmt);
   if (rc != RC::SUCCESS) {
     LOG_WARN("cannot construct filter stmt");
     return rc;
@@ -102,7 +91,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   // everything alright
   SelectStmt *select_stmt = new SelectStmt();
 
-  select_stmt->tables_.swap(tables);
+  select_stmt->tables_.swap(binder_context.table_map());
   select_stmt->query_expressions_.swap(bound_expressions);
   select_stmt->filter_stmt_ = filter_stmt;
   select_stmt->group_by_.swap(group_by_expressions);

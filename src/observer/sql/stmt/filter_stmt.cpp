@@ -19,54 +19,36 @@ See the Mulan PSL v2 for more details. */
 #include "storage/table/table.h"
 #include "sql/parser/expression_binder.h"
 
-FilterStmt::~FilterStmt()
+FilterStmt::~FilterStmt() { filter_units_.clear(); }
+
+RC FilterStmt::create(Table *default_table, const ConditionSqlNode *conditions, int condition_num, FilterStmt *&stmt)
 {
-  for (FilterUnit *unit : filter_units_) {
-    delete unit;
-  }
-  filter_units_.clear();
+  BinderContext binder_context;
+  binder_context.add_table(default_table->name(), default_table);
+  ExpressionBinder binder(binder_context);
+  return create(binder, conditions, condition_num, stmt);
 }
 
-RC FilterStmt::create(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
-    const ConditionSqlNode *conditions, int condition_num, FilterStmt *&stmt)
+RC FilterStmt::create(ExpressionBinder &binder, const ConditionSqlNode *conditions,
+    int condition_num, FilterStmt *&stmt)
 {
   RC rc = RC::SUCCESS;
   stmt  = nullptr;
 
   FilterStmt *tmp_stmt = new FilterStmt();
-  for (int i = 0; i < condition_num; i++) {
-    FilterUnit *filter_unit = nullptr;
 
-    rc = create_filter_unit(db, default_table, tables, conditions[i], filter_unit);
+  std::vector<std::unique_ptr<Expression>> units;
+  for (int i = 0; i < condition_num; i++) {
+    std::unique_ptr<Expression> filter_unit(conditions[i].condition);
+    rc = binder.bind_expression(filter_unit, units);
     if (rc != RC::SUCCESS) {
       delete tmp_stmt;
       LOG_WARN("failed to create filter unit. condition index=%d", i);
       return rc;
     }
-    tmp_stmt->filter_units_.push_back(filter_unit);
   }
 
-  stmt = tmp_stmt;
-  return rc;
-}
-
-RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
-    const ConditionSqlNode &condition, FilterUnit *&filter_unit)
-{
-  RC rc = RC::SUCCESS;
-
-  filter_unit = new FilterUnit;
-
-  rc = condition.condition->init(db, default_table, tables);
-
-  if (rc != RC::SUCCESS) {
-    delete filter_unit;
-    LOG_WARN("failed to init condition in filter unit");
-    return rc;
-  }
-
-  filter_unit->set_condition(condition.condition);
-
-  // 检查两个类型是否能够比较
+  tmp_stmt->filter_units_ = std::move(units);
+  stmt                    = tmp_stmt;
   return rc;
 }

@@ -100,10 +100,10 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   unique_ptr<LogicalOperator> table_oper(nullptr);
   last_oper = &table_oper;
 
-  const std::vector<Table *> &tables = select_stmt->tables();
-  for (Table *table : tables) {
+  const auto &tables = select_stmt->tables();
+  for (const std::pair<const std::string &, Table *> pair : tables) {
 
-    unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, ReadWriteMode::READ_ONLY));
+    unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(pair.second, ReadWriteMode::READ_ONLY));
     if (table_oper == nullptr) {
       table_oper = std::move(table_get_oper);
     } else {
@@ -156,13 +156,13 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
 
 RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<LogicalOperator> &logical_operator)
 {
-  RC                                  rc = RC::SUCCESS;
-  std::vector<unique_ptr<Expression>> cmp_exprs;
-  const std::vector<FilterUnit *>    &filter_units = filter_stmt->filter_units();
+  RC                                        rc = RC::SUCCESS;
+  std::vector<unique_ptr<Expression>>       cmp_exprs;
+  std::vector<std::unique_ptr<Expression>> &filter_units = filter_stmt->filter_units();
   cmp_exprs.reserve(filter_units.size());
 
-  for (FilterUnit *filter_unit : filter_units) {
-    cmp_exprs.emplace_back(filter_unit->get_condition());
+  for (auto &filter_unit : filter_units) {
+    cmp_exprs.emplace_back(std::move(filter_unit));
   }
 
   unique_ptr<PredicateLogicalOperator> predicate_oper;

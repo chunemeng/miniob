@@ -23,20 +23,7 @@ See the Mulan PSL v2 for more details. */
 class Db;
 class Table;
 class FieldMeta;
-
-class FilterUnit
-{
-public:
-  FilterUnit() = default;
-  ~FilterUnit() {}
-
-  void set_condition(Expression *obj) { condition_.reset(obj); }
-
-  std::unique_ptr<Expression> get_condition() { return std::move(condition_); }
-
-private:
-  std::unique_ptr<Expression> condition_;
-};
+class ExpressionBinder;
 
 /**
  * @brief Filter/谓词/过滤语句
@@ -49,15 +36,13 @@ public:
   virtual ~FilterStmt();
 
 public:
-  const std::vector<FilterUnit *> &filter_units() const { return filter_units_; }
+  std::vector<unique_ptr<Expression>> &filter_units() { return filter_units_; }
 
 public:
-  static RC create(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
-      const ConditionSqlNode *conditions, int condition_num, FilterStmt *&stmt);
+  static RC create(Table *default_table, const ConditionSqlNode *conditions, int condition_num, FilterStmt *&stmt);
 
-  static RC create_filter_unit(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
-      const ConditionSqlNode &condition, FilterUnit *&filter_unit);
+  static RC create(ExpressionBinder &binder, const ConditionSqlNode *conditions, int condition_num, FilterStmt *&stmt);
 
 private:
-  std::vector<FilterUnit *> filter_units_;  // 默认当前都是AND关系
+  std::vector<std::unique_ptr<Expression>> filter_units_;  // 默认当前都是AND关系
 };

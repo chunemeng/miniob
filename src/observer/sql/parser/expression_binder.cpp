@@ -24,12 +24,9 @@ using namespace common;
 
 Table *BinderContext::find_table(const char *table_name) const
 {
-  auto pred = [table_name](Table *table) { return 0 == strcasecmp(table_name, table->name()); };
-  auto iter = ranges::find_if(query_tables_, pred);
-  if (iter == query_tables_.end()) {
-    return nullptr;
-  }
-  return *iter;
+  auto iter = table_map_.find(table_name);
+  LOG_INFO(" table is %d", iter == table_map_.end());
+  return iter == table_map_.end() ? nullptr : iter->second;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -109,8 +106,6 @@ RC ExpressionBinder::bind_star_expression(
 
   auto star_expr = static_cast<StarExpr *>(expr.get());
 
-  vector<Table *> tables_to_wildcard;
-
   const char *table_name = star_expr->table_name();
   if (!is_blank(table_name) && 0 != strcmp(table_name, "*")) {
     Table *table = context_.find_table(table_name);
@@ -118,15 +113,13 @@ RC ExpressionBinder::bind_star_expression(
       LOG_INFO("no such table in from list: %s", table_name);
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
-
-    tables_to_wildcard.push_back(table);
-  } else {
-    const vector<Table *> &all_tables = context_.query_tables();
-    tables_to_wildcard.insert(tables_to_wildcard.end(), all_tables.begin(), all_tables.end());
+    wildcard_fields(table, bound_expressions);
   }
 
-  for (Table *table : tables_to_wildcard) {
-    wildcard_fields(table, bound_expressions);
+  auto &all_tables = context_.table_map();
+  // don't change it to auto, because it may lose const & in std::string!!!
+  for (const std::pair<const std::string &, Table *> pair : all_tables) {
+    wildcard_fields(pair.second, bound_expressions);
   }
 
   return RC::SUCCESS;
@@ -146,12 +139,12 @@ RC ExpressionBinder::bind_unbound_field_expression(
 
   Table *table = nullptr;
   if (is_blank(table_name)) {
-    if (context_.query_tables().size() != 1) {
+    if (context_.table_map().size() != 1) {
       LOG_INFO("cannot determine table for field: %s", field_name);
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
 
-    table = context_.query_tables()[0];
+    table = context_.table_map().begin()->second;
   } else {
     table = context_.find_table(table_name);
     if (nullptr == table) {
@@ -268,7 +261,7 @@ RC ExpressionBinder::bind_comparison_expression(
     right_expr.reset(right.release());
   }
 
-  AttrType left_attr_type = left_expr->value_type();
+  AttrType left_attr_type  = left_expr->value_type();
   AttrType right_attr_type = right_expr->value_type();
 
   if (left_attr_type != right_attr_type) {

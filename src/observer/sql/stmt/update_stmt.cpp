@@ -54,8 +54,6 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
   auto values                 = new Value[value_num];
   values[0]                   = update.value;
 
-  std::unordered_map<std::string, Table *> table_map;
-  table_map.insert(std::pair<std::string, Table *>(std::string(table_name), table));
 
   const FieldMeta *field_meta = table->table_meta().field(update.attribute_name.c_str());
   if (nullptr == field_meta) {
@@ -65,8 +63,7 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
   }
 
   FilterStmt *filter_stmt = nullptr;
-  RC          rc          = FilterStmt::create(
-      db, table, &table_map, update.conditions.data(), static_cast<int>(update.conditions.size()), filter_stmt);
+  RC          rc          = FilterStmt::create(table, update.conditions.data(), static_cast<int>(update.conditions.size()), filter_stmt);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to create filter statement. rc=%d:%s", rc, strrc(rc));
     return rc;

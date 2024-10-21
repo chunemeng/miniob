@@ -22,5 +22,6 @@ array<unique_ptr<DataType>, static_cast<int>(AttrType::MAXTYPE)> DataType::type_
     make_unique<FloatType>(),
     make_unique<VectorType>(),
     make_unique<DateType>(),
+    make_unique<DataType>(AttrType::NULLS),
     make_unique<DataType>(AttrType::BOOLEANS),
 };
