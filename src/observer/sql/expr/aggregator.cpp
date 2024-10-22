@@ -79,7 +79,7 @@ RC AvgAggregator::evaluate(Value &result)
   }
 
   if (value_.attr_type() == AttrType::INTS) {
-    result = Value((float )value_.get_int() / (float )count_);
+    result = Value(value_.get_int() / count_);
   } else if (value_.attr_type() == AttrType::FLOATS) {
     result = Value(value_.get_float() / static_cast<float>(count_));
   } else {
