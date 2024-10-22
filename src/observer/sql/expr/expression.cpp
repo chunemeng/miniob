@@ -127,12 +127,6 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
   result = false;
 
   if (left.attr_type() == AttrType::NULLS || right.attr_type() == AttrType::NULLS) {
-    auto res = left.attr_type() == AttrType::NULLS ? left.compare(right) : right.compare(left);
-    switch (comp_) {
-      case EQUAL_TO: result = (res == 0); break;
-      case NOT_EQUAL: result = (res == INT32_MAX); break;
-      default: result = false; break;
-    }
     return rc;
   }
 
