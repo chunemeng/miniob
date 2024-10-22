@@ -253,21 +253,34 @@ RC Table::update_record(Record &record, const FieldMeta *field_meta, Value *valu
 
   auto data = new char[table_meta_.record_size()];
   memcpy(data, record.data(), table_meta_.record_size());
+  auto null_map = reinterpret_cast<int *>(data + table_meta_.null_field_offset());
 
   for (int i = 0; i < value_num && OB_SUCC(rc); i++) {
     const FieldMeta *field = field_meta;
     const Value     &value = values[i];
-    if (field->type() != value.attr_type()) {
-      Value real_value;
-      rc = Value::cast_to(value, field->type(), real_value);
-      if (OB_FAIL(rc)) {
-        LOG_WARN("failed to cast value. table name:%s,field name:%s,value:%s ",
+    // TODO: optimize this
+    if (value.attr_type() == AttrType::NULLS) {
+      if (!field->nullable()) {
+        LOG_WARN("insert null into not nullable field. table name:%s,field name:%s,value:%s ",
             table_meta_.name(), field->name(), value.to_string().c_str());
+        rc = RC::INVALID_ARGUMENT;
         break;
       }
-      rc = set_value_to_record(data, real_value, field);
+      ASSERT(value_num <= 32, "can't support more than 32 fields");
+      null_map[0] |= (1 << i);
     } else {
-      rc = set_value_to_record(data, value, field);
+      if (field->type() != value.attr_type()) {
+        Value real_value;
+        rc = Value::cast_to(value, field->type(), real_value);
+        if (OB_FAIL(rc)) {
+          LOG_WARN("failed to cast value. table name:%s,field name:%s,value:%s ",
+            table_meta_.name(), field->name(), value.to_string().c_str());
+          break;
+        }
+        rc = set_value_to_record(data, real_value, field);
+      } else {
+        rc = set_value_to_record(data, value, field);
+      }
     }
   }
   Record new_record;
@@ -354,22 +367,38 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
   char *record_data = (char *)malloc(record_size);
   memset(record_data, 0, record_size);
 
+  auto null_map = reinterpret_cast<int *>(record_data + normal_field_start_index - table_meta_.null_field_num());
+
   for (int i = 0; i < value_num && OB_SUCC(rc); i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
     const Value     &value = values[i];
-    if (field->type() != value.attr_type()) {
-      Value real_value;
-      rc = Value::cast_to(value, field->type(), real_value);
-      if (OB_FAIL(rc)) {
-        LOG_WARN("failed to cast value. table name:%s,field name:%s,value:%s ",
+
+    // TODO: optimize this
+    if (value.attr_type() == AttrType::NULLS) {
+      if (!field->nullable()) {
+        LOG_WARN("insert null into not nullable field. table name:%s,field name:%s,value:%s ",
             table_meta_.name(), field->name(), value.to_string().c_str());
+        rc = RC::INVALID_ARGUMENT;
         break;
       }
-      rc = set_value_to_record(record_data, real_value, field);
+      ASSERT(value_num <= 32, "can't support more than 32 fields");
+      null_map[0] |= (1 << i);
     } else {
-      rc = set_value_to_record(record_data, value, field);
+      if (field->type() != value.attr_type()) {
+        Value real_value;
+        rc = Value::cast_to(value, field->type(), real_value);
+        if (OB_FAIL(rc)) {
+          LOG_WARN("failed to cast value. table name:%s,field name:%s,value:%s ",
+            table_meta_.name(), field->name(), value.to_string().c_str());
+          break;
+        }
+        rc = set_value_to_record(record_data, real_value, field);
+      } else {
+        rc = set_value_to_record(record_data, value, field);
+      }
     }
   }
+
   if (OB_FAIL(rc)) {
     LOG_WARN("failed to make record. table name:%s", table_meta_.name());
     free(record_data);

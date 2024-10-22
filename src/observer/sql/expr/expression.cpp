@@ -126,6 +126,16 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
   RC rc  = RC::SUCCESS;
   result = false;
 
+  if (left.attr_type() == AttrType::NULLS || right.attr_type() == AttrType::NULLS) {
+    auto res = left.attr_type() == AttrType::NULLS ? left.compare(right) : right.compare(left);
+    switch (comp_) {
+      case EQUAL_TO: result = (res == 0); break;
+      case NOT_EQUAL: result = (res == INT32_MAX); break;
+      default: result = false; break;
+    }
+    return rc;
+  }
+
   switch (comp_) {
     case EQUAL_TO: {
       result = (0 == left.compare(right));
@@ -328,6 +338,11 @@ AttrType ArithmeticExpr::value_type() const
 RC ArithmeticExpr::calc_value(const Value &left_value, const Value &right_value, Value &value) const
 {
   RC rc = RC::SUCCESS;
+
+  if (left_value.attr_type() == AttrType::NULLS || right_value.attr_type() == AttrType::NULLS) {
+    value.set_null();
+    return rc;
+  }
 
   const AttrType target_type = value_type();
   value.set_type(target_type);

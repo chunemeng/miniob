@@ -34,6 +34,7 @@ static void wildcard_fields(Table *table, vector<unique_ptr<Expression>> &expres
 {
   const TableMeta &table_meta = table->table_meta();
   const int        field_num  = table_meta.field_num();
+
   for (int i = table_meta.sys_field_num(); i < field_num; i++) {
     Field      field(table, table_meta.field(i));
     FieldExpr *field_expr = new FieldExpr(field);
@@ -109,6 +110,7 @@ RC ExpressionBinder::bind_star_expression(
   const char *table_name = star_expr->table_name();
   if (!is_blank(table_name) && 0 != strcmp(table_name, "*")) {
     Table *table = context_.find_table(table_name);
+    LOG_INFO(" table is %d", table == nullptr);
     if (nullptr == table) {
       LOG_INFO("no such table in from list: %s", table_name);
       return RC::SCHEMA_TABLE_NOT_EXIST;
@@ -217,6 +219,14 @@ RC ExpressionBinder::bind_cast_expression(
   return RC::SUCCESS;
 }
 
+static int implicit_cast_cost(AttrType from, AttrType to)
+{
+  if (from == to) {
+    return 0;
+  }
+  return DataType::type_instance(from)->cast_cost(to);
+}
+
 RC ExpressionBinder::bind_comparison_expression(
     unique_ptr<Expression> &expr, vector<unique_ptr<Expression>> &bound_expressions)
 {
@@ -264,7 +274,13 @@ RC ExpressionBinder::bind_comparison_expression(
   AttrType left_attr_type  = left_expr->value_type();
   AttrType right_attr_type = right_expr->value_type();
 
+  if (left_attr_type == AttrType::NULLS || right_attr_type == AttrType::NULLS) {
+    bound_expressions.emplace_back(std::move(expr));
+    return RC::SUCCESS;
+  }
+
   if (left_attr_type != right_attr_type) {
+    LOG_INFO("left type: %s, right type: %s", attr_type_to_string(left_attr_type), attr_type_to_string(right_attr_type));
     auto left_to_right_cost = implicit_cast_cost(left_attr_type, right_attr_type);
     auto right_to_left_cost = implicit_cast_cost(right_attr_type, left_attr_type);
     if (left_to_right_cost <= right_to_left_cost && left_to_right_cost != INT32_MAX) {

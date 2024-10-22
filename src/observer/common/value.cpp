@@ -158,6 +158,14 @@ void Value::set_float(float val)
   value_.float_value_ = val;
   length_             = sizeof(val);
 }
+
+void Value::set_null(int len /*= 0*/)
+{
+  reset();
+  attr_type_ = AttrType::NULLS;
+  length_    = len;
+}
+
 void Value::set_boolean(bool val)
 {
   reset();
@@ -202,6 +210,7 @@ void Value::set_value(const Value &value)
     case AttrType::BOOLEANS: {
       set_boolean(value.get_boolean());
     } break;
+
     default: {
       ASSERT(false, "got an invalid value type");
     } break;

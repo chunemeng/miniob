@@ -401,6 +401,7 @@ RC RowRecordPageHandler::get_record(const RID &rid, Record &record)
 
   record.set_rid(rid);
   record.set_data(get_record_data(rid.slot_num), page_header_->record_real_size);
+
   return RC::SUCCESS;
 }
 

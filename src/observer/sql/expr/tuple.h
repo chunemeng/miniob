@@ -199,8 +199,15 @@ public:
 
     FieldExpr       *field_expr = speces_[index];
     const FieldMeta *field_meta = field_expr->field().meta();
-    cell.set_type(field_meta->type());
-    cell.set_data(this->record_->data() + field_meta->offset(), field_meta->len());
+    const auto       table_meta = table_->table_meta();
+    auto             null_map   = reinterpret_cast<int *>(record_->data() + table_meta.null_field_offset());
+    if (null_map[0] & (1 << (field_meta->field_id()))) {
+      cell.set_null(field_meta->len());
+      return RC::SUCCESS;
+    } else {
+      cell.set_type(field_meta->type());
+      cell.set_data(this->record_->data() + field_meta->offset(), field_meta->len());
+    }
     return RC::SUCCESS;
   }
 
@@ -282,6 +289,8 @@ public:
     if (tuple_ == nullptr) {
       return RC::INTERNAL;
     }
+
+    LOG_INFO("cell_at index=%d", index);
 
     Expression *expr = expressions_[index].get();
     return expr->get_value(*tuple_, cell);

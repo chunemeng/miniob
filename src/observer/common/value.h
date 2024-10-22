@@ -18,6 +18,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/lang/memory.h"
 #include "common/type/attr_type.h"
 #include "common/type/data_type.h"
+#include "common/log/log.h"
 
 /**
  * @brief 属性的值
@@ -43,6 +44,8 @@ public:
   ~Value() { reset(); }
 
   Value(AttrType attr_type, char *data, int length = 4) : attr_type_(attr_type) { this->set_data(data, length); }
+
+  explicit Value(AttrType attr_type) : attr_type_(attr_type) { ASSERT(attr_type == AttrType::NULLS, "wrong way make value"); }
 
   explicit Value(int val);
   explicit Value(float val);
@@ -84,6 +87,10 @@ public:
 
   static RC cast_to(const Value &value, AttrType to_type, Value &result)
   {
+    if (value.attr_type() == AttrType::NULLS || to_type == AttrType::NULLS) {
+      result.set_null();
+      return RC::SUCCESS;
+    }
     return DataType::type_instance(value.attr_type())->cast_to(value, to_type, result);
   }
 
@@ -92,6 +99,7 @@ public:
   void set_data(const char *data, int length) { this->set_data(const_cast<char *>(data), length); }
   void set_value(const Value &value);
   void set_boolean(bool val);
+  void set_null(int len = 0);
 
   string to_string() const;
 

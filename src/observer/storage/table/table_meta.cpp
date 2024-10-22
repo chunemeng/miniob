@@ -64,29 +64,46 @@ RC TableMeta::init(int32_t table_id, const char *name, const std::vector<FieldMe
   if (trx_fields != nullptr) {
     trx_fields_ = *trx_fields;
 
-    fields_.resize(attributes.size() + trx_fields->size());
+    fields_.resize(attributes.size() + trx_fields->size() + null_field_num());
     for (size_t i = 0; i < trx_fields->size(); i++) {
       const FieldMeta &field_meta = (*trx_fields)[i];
-      fields_[i]                  = FieldMeta(field_meta.name(),
+      rc                          = fields_[i].init(field_meta.name(),
           field_meta.type(),
           field_offset,
           field_meta.len(),
           false /*visible*/,
-          field_meta.field_id(),
-          field_meta.nullable());
+          field_meta.field_id());
       field_offset += field_meta.len();
+      if (rc != RC::SUCCESS) {
+        LOG_ERROR("Failed to init field meta. table name=%s, field name: %s", name, field_meta.name());
+        return rc;
+      }
     }
 
-    trx_field_num = static_cast<int>(trx_fields->size());
+    fields_[trx_fields->size()].init(
+        "__null", AttrType::INTS, field_offset /*attr_offset*/, 4 /*attr_len*/, false /*visible*/, -3 /*field_id*/);
+    field_offset += sizeof(int);
+
+    trx_field_num = static_cast<int>(trx_fields->size() + null_field_num());
   } else {
-    fields_.resize(attributes.size());
+    fields_.resize(attributes.size() + 1);
+
+    fields_[null_field_num() - 1].init("__null", AttrType::INTS, field_offset, 4, false /*visible*/, -3 /*field_id*/);
+    field_offset += sizeof(int);
+    trx_field_num = null_field_num();
   }
 
   for (size_t i = 0; i < attributes.size(); i++) {
     const AttrInfoSqlNode &attr_info = attributes[i];
     // `i` is the col_id of fields[i]
-    rc = fields_[i + trx_field_num].init(
-        attr_info.name.c_str(), attr_info.type, field_offset, attr_info.length, true /*visible*/, i, attr_info.nullable);
+
+    rc = fields_[i + trx_field_num].init(attr_info.name.c_str(),
+        attr_info.type,
+        field_offset,
+        attr_info.length,
+        true /*visible*/,
+        i,
+        attr_info.nullable);
     if (OB_FAIL(rc)) {
       LOG_ERROR("Failed to init field meta. table name=%s, field name: %s", name, attr_info.name.c_str());
       return rc;
@@ -114,7 +131,10 @@ const char *TableMeta::name() const { return name_.c_str(); }
 
 const FieldMeta *TableMeta::trx_field() const { return &fields_[0]; }
 
-span<const FieldMeta> TableMeta::trx_fields() const { return span<const FieldMeta>(fields_.data(), sys_field_num()); }
+span<const FieldMeta> TableMeta::trx_fields() const
+{
+  return span<const FieldMeta>(fields_.data(), sys_field_num() - null_field_num());
+}
 
 const FieldMeta *TableMeta::field(int index) const { return &fields_[index]; }
 const FieldMeta *TableMeta::field(const char *name) const
@@ -141,7 +161,11 @@ const FieldMeta *TableMeta::find_field_by_offset(int offset) const
 }
 int TableMeta::field_num() const { return fields_.size(); }
 
-int TableMeta::sys_field_num() const { return static_cast<int>(trx_fields_.size()); }
+int TableMeta::sys_field_num() const { return static_cast<int>(trx_fields_.size() + null_field_num()); }
+
+int TableMeta::null_field_num() const { return 1; }
+
+int TableMeta::null_field_offset() const { return static_cast<int>(trx_fields_.size()); }
 
 const IndexMeta *TableMeta::index(const char *name) const
 {
@@ -271,7 +295,7 @@ int TableMeta::deserialize(std::istream &is)
   record_size_ = fields_.back().offset() + fields_.back().len() - fields_.begin()->offset();
 
   for (const FieldMeta &field_meta : fields_) {
-    if (!field_meta.visible()) {
+    if (!field_meta.visible() && strcmp(field_meta.name(), "__null")) {
       trx_fields_.push_back(field_meta);  // 字段加上trx标识更好
     }
   }
