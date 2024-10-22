@@ -227,7 +227,6 @@ RC PhysicalPlanGenerator::create_plan(ProjectLogicalOperator &project_oper, uniq
   RC rc = RC::SUCCESS;
   if (!child_opers.empty()) {
     LogicalOperator *child_oper = child_opers.front().get();
-
     rc = create(*child_oper, child_phy_oper);
     if (OB_FAIL(rc)) {
       LOG_WARN("failed to create project logical operator's child physical operator. rc=%s", strrc(rc));

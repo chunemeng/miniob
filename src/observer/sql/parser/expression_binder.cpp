@@ -456,12 +456,18 @@ RC check_aggregate_expression(AggregateExpr &expression)
 RC ExpressionBinder::bind_aggregate_expression(
     unique_ptr<Expression> &expr, vector<unique_ptr<Expression>> &bound_expressions)
 {
+  LOG_DEBUG("bind aggregate expression");
   if (nullptr == expr) {
     return RC::SUCCESS;
   }
 
-  auto                unbound_aggregate_expr = static_cast<UnboundAggregateExpr *>(expr.get());
-  const char         *aggregate_name         = unbound_aggregate_expr->aggregate_name();
+  auto unbound_aggregate_expr = static_cast<UnboundAggregateExpr *>(expr.get());
+  if (unbound_aggregate_expr->child() == nullptr) {
+    LOG_WARN("child expression of aggregate expression is null");
+    return RC::INVALID_ARGUMENT;
+  }
+
+  const char         *aggregate_name = unbound_aggregate_expr->aggregate_name();
   AggregateExpr::Type aggregate_type;
   RC                  rc = AggregateExpr::type_from_string(aggregate_name, aggregate_type);
   if (OB_FAIL(rc)) {
