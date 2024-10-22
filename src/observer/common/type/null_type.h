@@ -19,7 +19,5 @@ public:
   RC multiply(const Value &left, const Value &right, Value &result) const override;
   RC divide(const Value &left, const Value &right, Value &result) const override;
 
-  int compare(const Value &left, const Value &right) const override;
-
   RC to_string(const Value &val, string &result) const override;
 };

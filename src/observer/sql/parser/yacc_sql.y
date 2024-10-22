@@ -62,6 +62,48 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   return expr;
 }
 
+UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
+                                           std::vector<RelAttrSqlNode>* child,
+                                           const char *sql_string,
+                                           YYLTYPE *llocp)
+{
+    if (child == nullptr) {
+           UnboundAggregateExpr *expr = new UnboundAggregateExpr(aggregate_name, nullptr);
+          expr->set_name(token_name(sql_string, llocp));
+          return expr;
+    }
+
+  if (child->size() == 1) {
+    auto exp = new UnboundFieldExpr((*child)[0].relation_name,(*child)[0].attribute_name);
+    UnboundAggregateExpr *expr = new UnboundAggregateExpr(aggregate_name, exp);
+    delete child;
+    expr->set_name(token_name(sql_string, llocp));
+    return expr;
+  } else {
+      UnboundAggregateExpr *expr = new UnboundAggregateExpr(aggregate_name, nullptr);
+      expr->set_name(token_name(sql_string, llocp));
+      delete child;
+      return expr;
+  }
+}
+
+UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
+                                           std::vector<std::unique_ptr<Expression>> child,
+                                           const char *sql_string,
+                                           YYLTYPE *llocp)
+{
+  if (child.size() == 1) {
+    UnboundAggregateExpr *expr = new UnboundAggregateExpr(aggregate_name, std::move(child[0]));
+    child.clear();
+    expr->set_name(token_name(sql_string, llocp));
+    return expr;
+  } else {
+      UnboundAggregateExpr *expr = new UnboundAggregateExpr(aggregate_name, nullptr);
+      expr->set_name(token_name(sql_string, llocp));
+      return expr;
+  }
+}
+
 %}
 
 %define api.pure full
@@ -108,6 +150,11 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         INTO
         VALUES
         FROM
+        SUM
+        AVG
+        MAX
+        MIN
+        COUNT
         WHERE
         NOT
         LIKE
@@ -168,6 +215,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <string>              relation
 %type <comp>                comp_op
 %type <rel_attr>            rel_attr
+%type <rel_attr_list>       rel_attr_list
 %type <attr_infos>          attr_def_list
 %type <attr_info>           attr_def
 %type <value_list>          value_list
@@ -461,7 +509,8 @@ value:
       @$ = @1;
     }
     | NULL_T {
-        $$ = new Value(AttrType::NULLS);
+        $$ = new Value();
+        $$->set_null();
         @$ = @1;
     }
     |SSS {
@@ -599,6 +648,42 @@ expression:
     | '*' {
       $$ = new StarExpr();
     }
+    | COUNT LBRACE rel_attr_list RBRACE {
+      $$ = create_aggregate_expression("COUNT",$3, sql_string, &@$);
+    }
+    | SUM LBRACE rel_attr_list RBRACE {
+      $$ = create_aggregate_expression("SUM", $3, sql_string, &@$);
+    }
+    | AVG LBRACE rel_attr_list RBRACE {
+      $$ = create_aggregate_expression("AVG",$3, sql_string, &@$);
+    }
+    | MAX LBRACE rel_attr_list RBRACE {
+      $$ = create_aggregate_expression("MAX",$3, sql_string, &@$);
+    }
+    | MIN LBRACE rel_attr_list RBRACE {
+      $$ = create_aggregate_expression("MIN",$3, sql_string, &@$);
+    }
+        | COUNT LBRACE expression_list RBRACE {
+          $$ = create_aggregate_expression("COUNT",std::move(*$3), sql_string, &@$);
+          delete $3;
+        }
+        | SUM LBRACE expression_list RBRACE {
+          $$ = create_aggregate_expression("SUM", std::move(*$3), sql_string, &@$);
+          delete $3;
+        }
+        | AVG LBRACE expression_list RBRACE {
+          $$ = create_aggregate_expression("AVG",std::move(*$3), sql_string, &@$);
+            delete $3;
+        }
+        | MAX LBRACE expression_list RBRACE {
+          $$ = create_aggregate_expression("MAX",std::move(*$3), sql_string, &@$);
+            delete $3;
+        }
+        | MIN LBRACE expression_list RBRACE {
+          $$ = create_aggregate_expression("MIN",std::move(*$3), sql_string, &@$);
+          delete $3;
+
+        }
     // your code here
     ;
 
@@ -638,6 +723,27 @@ rel_attr:
       $$->attribute_name = $3;
       free($1);
       free($3);
+    }
+    ;
+
+rel_attr_list:
+    /* empty */
+    {
+       $$ = nullptr;
+    }
+    | rel_attr {
+      $$ = new std::vector<RelAttrSqlNode>;
+      $$->emplace_back(*$1);
+      delete $1;
+    }
+    | rel_attr COMMA rel_attr_list {
+      if ($3 != nullptr) {
+        $$ = $3;
+      } else {
+        $$ = new std::vector<RelAttrSqlNode>;
+      }
+      $$->emplace_back(*$1);
+      delete $1;
     }
     ;
 
