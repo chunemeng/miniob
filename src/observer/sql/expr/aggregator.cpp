@@ -17,16 +17,17 @@ See the Mulan PSL v2 for more details. */
 
 RC SumAggregator::accumulate(const Value &value)
 {
+
   if (value.attr_type() == AttrType::NULLS) {
     return RC::SUCCESS;
   }
 
-  if (value_.attr_type() == AttrType::UNDEFINED) {
+  if (value_.attr_type() == AttrType::NULLS) {
     value_ = value;
     return RC::SUCCESS;
   }
 
-  ASSERT(value.attr_type() == value_.attr_type(), "type mismatch. value type: %s, value_.type: %s", 
+  ASSERT(value.attr_type() == value_.attr_type(), "type mismatch. value type: %s, value_.type: %s",
         attr_type_to_string(value.attr_type()), attr_type_to_string(value_.attr_type()));
 
   Value::add(value, value_, value_);
@@ -58,7 +59,7 @@ RC AvgAggregator::accumulate(const Value &value)
     return RC::SUCCESS;
   }
 
-  if (value_.attr_type() == AttrType::UNDEFINED) {
+  if (value_.attr_type() == AttrType::NULLS) {
     count_++;
     value_ = value;
     return RC::SUCCESS;
@@ -90,7 +91,7 @@ RC AvgAggregator::evaluate(Value &result)
 }
 RC MaxAggregator::accumulate(const Value &value)
 {
-  if (value_.attr_type() == AttrType::UNDEFINED) {
+  if (value_.attr_type() == AttrType::NULLS) {
     value_ = value;
     return RC::SUCCESS;
   }
@@ -110,7 +111,7 @@ RC MaxAggregator::evaluate(Value &result)
 }
 RC MinAggregator::accumulate(const Value &value)
 {
-  if (value_.attr_type() == AttrType::UNDEFINED) {
+  if (value_.attr_type() == AttrType::NULLS) {
     value_ = value;
     return RC::SUCCESS;
   }
