@@ -38,13 +38,13 @@ public:
       bool nullable = false);
 
 public:
-  const char *name() const;
-  AttrType    type() const;
-  int         offset() const;
-  int         len() const;
-  bool        visible() const;
-  bool        nullable() const;
-  int         field_id() const;
+  const std::string &name() const;
+  AttrType           type() const;
+  int                offset() const;
+  int                len() const;
+  bool               visible() const;
+  bool               nullable() const;
+  int                field_id() const;
 
 public:
   void desc(ostream &os) const;

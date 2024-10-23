@@ -26,7 +26,11 @@ public:
 
   void add_table(const char *name, Table *table) { table_map_.emplace(name, table); }
 
+  void add_table(const std::string &name, Table *table) { table_map_.emplace(name, table); }
+
   Table *find_table(const char *table_name) const;
+
+  Table *find_table(const std::string &table_name) const;
 
   std::unordered_map<std::string, Table *> &table_map() { return table_map_; }
 

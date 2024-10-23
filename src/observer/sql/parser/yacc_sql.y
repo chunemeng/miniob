@@ -144,7 +144,6 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         STRING_T
         DATE_T
         FLOAT_T
-        VECTOR_T
         HELP
         EXIT
         DOT //QUOTE
@@ -184,7 +183,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %union {
   ParsedSqlNode *                            sql_node;
   ConditionSqlNode *                         condition;
-  InnerJoinSqlNode *                         inner_join;
+  InnerJoinSqlNode *                         inner_j;
   Value *                                    value;
   enum CompOp                                comp;
   RelAttrSqlNode *                           rel_attr;
@@ -221,7 +220,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <attr_infos>          attr_def_list
 %type <attr_info>           attr_def
 %type <value_list>          value_list
-%type <inner_join>          inner_join
+%type <inner_j>             inner_join
 %type <inner_join_list>     inner_joins
 %type <condition_list>      where
 %type <condition_list>      condition_list
@@ -706,9 +705,14 @@ inner_joins:
     ;
 inner_join:
     INNER JOIN ID ON condition_list {
-      $$ = new InnerJoinSqlNode;
+      $$ = new InnerJoinSqlNode();
       $$->relation_name = $3;
       $$->conditions.swap(*$5);
+      free($3);
+    }
+    | INNER JOIN ID {
+      $$ = new InnerJoinSqlNode();
+      $$->relation_name = $3;
       free($3);
     }
     ;

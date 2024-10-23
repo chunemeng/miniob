@@ -68,7 +68,7 @@ RC DefaultConditionFilter::init(Table &table, const OLD_ConditionNode &condition
     left.is_attr                = true;
     const FieldMeta *field_left = table_meta.field(condition.left_attr.attribute_name.c_str());
     if (nullptr == field_left) {
-      LOG_WARN("No such field in condition. %s.%s", table.name(), condition.left_attr.attribute_name.c_str());
+      LOG_WARN("No such field in condition. %s.%s", table.name().c_str(), condition.left_attr.attribute_name.c_str());
       return RC::SCHEMA_FIELD_MISSING;
     }
     left.attr_length = field_left->len();
@@ -88,7 +88,7 @@ RC DefaultConditionFilter::init(Table &table, const OLD_ConditionNode &condition
     right.is_attr                = true;
     const FieldMeta *field_right = table_meta.field(condition.right_attr.attribute_name.c_str());
     if (nullptr == field_right) {
-      LOG_WARN("No such field in condition. %s.%s", table.name(), condition.right_attr.attribute_name.c_str());
+      LOG_WARN("No such field in condition. %s.%s", table.name().c_str(), condition.right_attr.attribute_name.c_str());
       return RC::SCHEMA_FIELD_MISSING;
     }
     right.attr_length = field_right->len();

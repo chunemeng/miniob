@@ -64,7 +64,7 @@ RC FieldMeta::init(
   return RC::SUCCESS;
 }
 
-const char *FieldMeta::name() const { return name_.c_str(); }
+const std::string &FieldMeta::name() const { return name_; }
 
 AttrType FieldMeta::type() const { return attr_type_; }
 

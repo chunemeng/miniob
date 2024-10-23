@@ -224,7 +224,7 @@ RC Db::open_all_tables()
 
     if (opened_tables_.count(table->name()) != 0) {
       LOG_ERROR("Duplicate table with difference file name. table=%s, the other filename=%s",
-          table->name(), filename.c_str());
+          table->name().c_str(), filename.c_str());
       // 在这里原本先删除table后调用table->name()方法，犯了use-after-free的错误
       delete table;
       return RC::INTERNAL;
@@ -234,7 +234,7 @@ RC Db::open_all_tables()
       next_table_id_ = table->table_id() + 1;
     }
     opened_tables_[table->name()] = table;
-    LOG_INFO("Open table: %s, file: %s", table->name(), filename.c_str());
+    LOG_INFO("Open table: %s, file: %s", table->name().c_str(), filename.c_str());
   }
 
   LOG_INFO("All table have been opened. num=%d", opened_tables_.size());
@@ -258,10 +258,10 @@ RC Db::sync()
     Table *table = table_pair.second;
     rc           = table->sync();
     if (rc != RC::SUCCESS) {
-      LOG_ERROR("Failed to flush table. table=%s.%s, rc=%d:%s", name_.c_str(), table->name(), rc, strrc(rc));
+      LOG_ERROR("Failed to flush table. table=%s.%s, rc=%d:%s", name_.c_str(), table->name().c_str(), rc, strrc(rc));
       return rc;
     }
-    LOG_INFO("Successfully sync table db:%s, table:%s.", name_.c_str(), table->name());
+    LOG_INFO("Successfully sync table db:%s, table:%s.", name_.c_str(), table->name().c_str());
   }
 
   auto dblwr_buffer = static_cast<DiskDoubleWriteBuffer *>(buffer_pool_manager_->get_dblwr_buffer());

@@ -77,10 +77,10 @@ extern int yydebug;
     TRX_COMMIT = 278,              /* TRX_COMMIT  */
     TRX_ROLLBACK = 279,            /* TRX_ROLLBACK  */
     INT_T = 280,                   /* INT_T  */
-    STRING_T = 281,                /* STRING_T  */
-    DATE_T = 282,                  /* DATE_T  */
-    FLOAT_T = 283,                 /* FLOAT_T  */
-    VECTOR_T = 284,                /* VECTOR_T  */
+    VECTOR_T = 281,                /* VECTOR_T  */
+    STRING_T = 282,                /* STRING_T  */
+    DATE_T = 283,                  /* DATE_T  */
+    FLOAT_T = 284,                 /* FLOAT_T  */
     HELP = 285,                    /* HELP  */
     EXIT = 286,                    /* EXIT  */
     DOT = 287,                     /* DOT  */
@@ -132,7 +132,7 @@ union YYSTYPE
 
   ParsedSqlNode *                            sql_node;
   ConditionSqlNode *                         condition;
-  InnerJoinSqlNode *                         inner_join;
+  InnerJoinSqlNode *                         inner_j;
   Value *                                    value;
   enum CompOp                                comp;
   RelAttrSqlNode *                           rel_attr;

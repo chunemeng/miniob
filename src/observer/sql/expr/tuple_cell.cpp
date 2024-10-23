@@ -36,6 +36,17 @@ TupleCellSpec::TupleCellSpec(const char *table_name, const char *field_name, con
   }
 }
 
+TupleCellSpec::TupleCellSpec(const string &table_name, const string &field_name, const char *alias)
+{
+  table_name_ = table_name;
+  field_name_ = field_name;
+  if (alias) {
+    alias_ = alias;
+  } else {
+    alias_ = table_name_ + "." + field_name_;
+  }
+}
+
 TupleCellSpec::TupleCellSpec(const char *alias)
 {
   if (alias) {
@@ -43,5 +54,4 @@ TupleCellSpec::TupleCellSpec(const char *alias)
   }
 }
 
-TupleCellSpec::TupleCellSpec(const string &alias) : alias_(alias)
-{}
+TupleCellSpec::TupleCellSpec(const string &alias) : alias_(alias) {}

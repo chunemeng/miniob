@@ -67,7 +67,7 @@ RC TableMeta::init(int32_t table_id, const char *name, const std::vector<FieldMe
     fields_.resize(attributes.size() + trx_fields->size() + null_field_num());
     for (size_t i = 0; i < trx_fields->size(); i++) {
       const FieldMeta &field_meta = (*trx_fields)[i];
-      rc                          = fields_[i].init(field_meta.name(),
+      rc                          = fields_[i].init(field_meta.name().c_str(),
           field_meta.type(),
           field_offset,
           field_meta.len(),
@@ -75,7 +75,7 @@ RC TableMeta::init(int32_t table_id, const char *name, const std::vector<FieldMe
           field_meta.field_id());
       field_offset += field_meta.len();
       if (rc != RC::SUCCESS) {
-        LOG_ERROR("Failed to init field meta. table name=%s, field name: %s", name, field_meta.name());
+        LOG_ERROR("Failed to init field meta. table name=%s, field name: %s", name, field_meta.name().c_str());
         return rc;
       }
     }
@@ -128,6 +128,7 @@ RC TableMeta::add_index(const IndexMeta &index)
 }
 
 const char *TableMeta::name() const { return name_.c_str(); }
+const std::string& TableMeta::name_str() const { return name_; }
 
 const FieldMeta *TableMeta::trx_field() const { return &fields_[0]; }
 
@@ -143,7 +144,7 @@ const FieldMeta *TableMeta::field(const char *name) const
     return nullptr;
   }
   for (const FieldMeta &field : fields_) {
-    if (0 == strcmp(field.name(), name)) {
+    if (field.name() == name) {
       return &field;
     }
   }
@@ -295,7 +296,7 @@ int TableMeta::deserialize(std::istream &is)
   record_size_ = fields_.back().offset() + fields_.back().len() - fields_.begin()->offset();
 
   for (const FieldMeta &field_meta : fields_) {
-    if (!field_meta.visible() && strcmp(field_meta.name(), "__null")) {
+    if (!field_meta.visible() && field_meta.name() == "__null") {
       trx_fields_.push_back(field_meta);  // 字段加上trx标识更好
     }
   }

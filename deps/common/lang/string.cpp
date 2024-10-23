@@ -241,6 +241,7 @@ bool is_blank(const char *s)
   }
   return true;
 }
+bool is_blank(const std::string &s) { return s.empty(); }
 
 /**
  * 获取子串

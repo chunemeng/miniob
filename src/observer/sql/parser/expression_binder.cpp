@@ -25,7 +25,11 @@ using namespace common;
 Table *BinderContext::find_table(const char *table_name) const
 {
   auto iter = table_map_.find(table_name);
-  LOG_INFO(" table is %d", iter == table_map_.end());
+  return iter == table_map_.end() ? nullptr : iter->second;
+}
+Table *BinderContext::find_table(const string &table_name) const
+{
+  auto iter = table_map_.find(table_name);
   return iter == table_map_.end() ? nullptr : iter->second;
 }
 
@@ -107,12 +111,11 @@ RC ExpressionBinder::bind_star_expression(
 
   auto star_expr = static_cast<StarExpr *>(expr.get());
 
-  const char *table_name = star_expr->table_name();
-  if (!is_blank(table_name) && 0 != strcmp(table_name, "*")) {
+  const auto &table_name = star_expr->table_name();
+  if (!is_blank(table_name) && table_name == "*") {
     Table *table = context_.find_table(table_name);
-    LOG_INFO(" table is %d", table == nullptr);
     if (nullptr == table) {
-      LOG_INFO("no such table in from list: %s", table_name);
+      LOG_INFO("no such table in from list: %s", table_name.c_str());
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
     wildcard_fields(table, bound_expressions);
@@ -136,13 +139,13 @@ RC ExpressionBinder::bind_unbound_field_expression(
 
   auto unbound_field_expr = static_cast<UnboundFieldExpr *>(expr.get());
 
-  const char *table_name = unbound_field_expr->table_name();
-  const char *field_name = unbound_field_expr->field_name();
+  const auto &table_name = unbound_field_expr->table_name();
+  const auto &field_name = unbound_field_expr->field_name();
 
   Table *table = nullptr;
   if (is_blank(table_name)) {
     if (context_.table_map().size() != 1) {
-      LOG_INFO("cannot determine table for field: %s", field_name);
+      LOG_INFO("cannot determine table for field: %s", field_name.c_str());
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
 
@@ -150,17 +153,17 @@ RC ExpressionBinder::bind_unbound_field_expression(
   } else {
     table = context_.find_table(table_name);
     if (nullptr == table) {
-      LOG_INFO("no such table in from list: %s", table_name);
+      LOG_INFO("no such table in from list: %s", table_name.c_str());
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
   }
 
-  if (0 == strcmp(field_name, "*")) {
+  if (field_name == "*") {
     wildcard_fields(table, bound_expressions);
   } else {
-    const FieldMeta *field_meta = table->table_meta().field(field_name);
+    const FieldMeta *field_meta = table->table_meta().field(field_name.c_str());
     if (nullptr == field_meta) {
-      LOG_INFO("no such field in table: %s.%s", table_name, field_name);
+      LOG_INFO("no such field in table: %s.%s", table_name.c_str(), field_name.c_str());
       return RC::SCHEMA_FIELD_MISSING;
     }
 
@@ -468,11 +471,11 @@ RC ExpressionBinder::bind_aggregate_expression(
     return RC::INVALID_ARGUMENT;
   }
 
-  const char         *aggregate_name = unbound_aggregate_expr->aggregate_name();
+  const auto&                aggregate_name = unbound_aggregate_expr->aggregate_name();
   AggregateExpr::Type aggregate_type;
   RC                  rc = AggregateExpr::type_from_string(aggregate_name, aggregate_type);
   if (OB_FAIL(rc)) {
-    LOG_WARN("invalid aggregate name: %s", aggregate_name);
+    LOG_WARN("invalid aggregate name: %s", aggregate_name.c_str());
     return rc;
   }
 

@@ -109,8 +109,8 @@ public:
   RC visit_record(const RID &rid, function<bool(Record &)> visitor);
 
 public:
-  int32_t     table_id() const { return table_meta_.table_id(); }
-  const char *name() const;
+  int32_t            table_id() const { return table_meta_.table_id(); }
+  const std::string &name() const;
 
   Db *db() const { return db_; }
 

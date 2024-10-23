@@ -124,6 +124,9 @@ string double_to_str(double v);
 
 bool is_blank(const char *s);
 
+bool is_blank(const std::string & s);
+
+
 /**
  * 获取子串
  * 从s中提取下标为n1~n2的字符组成一个新字符串，然后返回这个新串的首地址
