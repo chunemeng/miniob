@@ -481,7 +481,7 @@ RC ExpressionBinder::bind_aggregate_expression(
 
   const auto         &aggregate_name = unbound_aggregate_expr->aggregate_name();
   AggregateExpr::Type aggregate_type;
-  RC                  rc = AggregateExpr::type_from_string(aggregate_name, aggregate_type);
+  RC                  rc = AggregateExpr::type_from_string(aggregate_name.c_str(), aggregate_type);
   if (OB_FAIL(rc)) {
     LOG_WARN("invalid aggregate name: %s", aggregate_name.c_str());
     return rc;

@@ -620,26 +620,19 @@ RC AggregateExpr::get_value(const Tuple &tuple, Value &value) const
 
 RC AggregateExpr::type_from_string(const char *type_str, AggregateExpr::Type &type)
 {
-  static const std::unordered_map<std::string, AggregateExpr::Type> type_map = {
-      {"count", Type::COUNT}, {"sum", Type::SUM}, {"avg", Type::AVG}, {"max", Type::MAX}, {"min", Type::MIN}};
-
-  auto it = type_map.find(type_str);
-  if (it != type_map.end()) {
-    type = it->second;
-    return RC::SUCCESS;
+  RC rc = RC::SUCCESS;
+  if (0 == strcasecmp(type_str, "count")) {
+    type = Type::COUNT;
+  } else if (0 == strcasecmp(type_str, "sum")) {
+    type = Type::SUM;
+  } else if (0 == strcasecmp(type_str, "avg")) {
+    type = Type::AVG;
+  } else if (0 == strcasecmp(type_str, "max")) {
+    type = Type::MAX;
+  } else if (0 == strcasecmp(type_str, "min")) {
+    type = Type::MIN;
+  } else {
+    rc = RC::INVALID_ARGUMENT;
   }
-  return RC::INVALID_ARGUMENT;
-}
-
-RC AggregateExpr::type_from_string(const std::string &type_str, AggregateExpr::Type &type)
-{
-  static const std::unordered_map<std::string, AggregateExpr::Type> type_map = {
-      {"count", Type::COUNT}, {"sum", Type::SUM}, {"avg", Type::AVG}, {"max", Type::MAX}, {"min", Type::MIN}};
-
-  auto it = type_map.find(type_str);
-  if (it != type_map.end()) {
-    type = it->second;
-    return RC::SUCCESS;
-  }
-  return RC::INVALID_ARGUMENT;
+  return rc;
 }
