@@ -48,13 +48,14 @@ public:
   ExpressionBinder(BinderContext &context) : context_(context) {}
   virtual ~ExpressionBinder() = default;
 
-  RC bind_expression(std::unique_ptr<Expression> &expr, std::vector<std::unique_ptr<Expression>> &bound_expressions);
+  RC bind_expression(std::unique_ptr<Expression> &expr, std::vector<std::unique_ptr<Expression>> &bound_expressions,
+      bool should_alis = false);
 
 private:
   RC bind_star_expression(
-      std::unique_ptr<Expression> &star_expr, std::vector<std::unique_ptr<Expression>> &bound_expressions);
+      std::unique_ptr<Expression> &star_expr, std::vector<std::unique_ptr<Expression>> &bound_expressions, bool should_alis = false);
   RC bind_unbound_field_expression(
-      std::unique_ptr<Expression> &unbound_field_expr, std::vector<std::unique_ptr<Expression>> &bound_expressions);
+      std::unique_ptr<Expression> &unbound_field_expr, std::vector<std::unique_ptr<Expression>> &bound_expressions, bool should_alis = false);
   RC bind_field_expression(
       std::unique_ptr<Expression> &field_expr, std::vector<std::unique_ptr<Expression>> &bound_expressions);
   RC bind_value_expression(

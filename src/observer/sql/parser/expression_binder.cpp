@@ -34,20 +34,24 @@ Table *BinderContext::find_table(const string &table_name) const
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-static void wildcard_fields(Table *table, vector<unique_ptr<Expression>> &expressions)
+static void wildcard_fields(Table *table, vector<unique_ptr<Expression>> &expressions, bool should_alis)
 {
   const TableMeta &table_meta = table->table_meta();
   const int        field_num  = table_meta.field_num();
-
   for (int i = table_meta.sys_field_num(); i < field_num; i++) {
     Field      field(table, table_meta.field(i));
     FieldExpr *field_expr = new FieldExpr(field);
-    field_expr->set_name(field.field_name());
+    if (should_alis) {
+      field_expr->set_name(field.table_name() + "." + field.field_name());
+    } else {
+      field_expr->set_name(field.field_name());
+    }
     expressions.emplace_back(field_expr);
   }
 }
 
-RC ExpressionBinder::bind_expression(unique_ptr<Expression> &expr, vector<unique_ptr<Expression>> &bound_expressions)
+RC ExpressionBinder::bind_expression(
+    unique_ptr<Expression> &expr, vector<unique_ptr<Expression>> &bound_expressions, bool should_alis)
 {
   if (nullptr == expr) {
     return RC::SUCCESS;
@@ -55,11 +59,11 @@ RC ExpressionBinder::bind_expression(unique_ptr<Expression> &expr, vector<unique
 
   switch (expr->type()) {
     case ExprType::STAR: {
-      return bind_star_expression(expr, bound_expressions);
+      return bind_star_expression(expr, bound_expressions, should_alis);
     } break;
 
     case ExprType::UNBOUND_FIELD: {
-      return bind_unbound_field_expression(expr, bound_expressions);
+      return bind_unbound_field_expression(expr, bound_expressions, should_alis);
     } break;
 
     case ExprType::UNBOUND_AGGREGATION: {
@@ -103,7 +107,7 @@ RC ExpressionBinder::bind_expression(unique_ptr<Expression> &expr, vector<unique
 }
 
 RC ExpressionBinder::bind_star_expression(
-    unique_ptr<Expression> &expr, vector<unique_ptr<Expression>> &bound_expressions)
+    unique_ptr<Expression> &expr, vector<unique_ptr<Expression>> &bound_expressions, bool should_alis)
 {
   if (nullptr == expr) {
     return RC::SUCCESS;
@@ -112,26 +116,26 @@ RC ExpressionBinder::bind_star_expression(
   auto star_expr = static_cast<StarExpr *>(expr.get());
 
   const auto &table_name = star_expr->table_name();
-  if (!is_blank(table_name) && table_name == "*") {
+  if (!is_blank(table_name) && table_name != "*") {
     Table *table = context_.find_table(table_name);
     if (nullptr == table) {
       LOG_INFO("no such table in from list: %s", table_name.c_str());
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
-    wildcard_fields(table, bound_expressions);
-  }
-
-  auto &all_tables = context_.table_map();
-  // don't change it to auto, because it may lose const & in std::string!!!
-  for (const std::pair<const std::string &, Table *> pair : all_tables) {
-    wildcard_fields(pair.second, bound_expressions);
+    wildcard_fields(table, bound_expressions, should_alis);
+  } else {
+    auto &all_tables = context_.table_map();
+    // don't change it to auto, because it may lose const & in std::string!!!
+    for (const std::pair<const std::string &, Table *> pair : all_tables) {
+      wildcard_fields(pair.second, bound_expressions, should_alis);
+    }
   }
 
   return RC::SUCCESS;
 }
 
 RC ExpressionBinder::bind_unbound_field_expression(
-    unique_ptr<Expression> &expr, vector<unique_ptr<Expression>> &bound_expressions)
+    unique_ptr<Expression> &expr, vector<unique_ptr<Expression>> &bound_expressions, bool should_alis)
 {
   if (nullptr == expr) {
     return RC::SUCCESS;
@@ -159,7 +163,7 @@ RC ExpressionBinder::bind_unbound_field_expression(
   }
 
   if (field_name == "*") {
-    wildcard_fields(table, bound_expressions);
+    wildcard_fields(table, bound_expressions, should_alis);
   } else {
     const FieldMeta *field_meta = table->table_meta().field(field_name.c_str());
     if (nullptr == field_meta) {
@@ -169,7 +173,11 @@ RC ExpressionBinder::bind_unbound_field_expression(
 
     Field      field(table, field_meta);
     FieldExpr *field_expr = new FieldExpr(field);
-    field_expr->set_name(field_name);
+    if (should_alis) {
+      field_expr->set_name(table_name + "." + field_name);
+    } else {
+      field_expr->set_name(field_name);
+    }
     bound_expressions.emplace_back(field_expr);
   }
 
@@ -471,7 +479,7 @@ RC ExpressionBinder::bind_aggregate_expression(
     return RC::INVALID_ARGUMENT;
   }
 
-  const auto&                aggregate_name = unbound_aggregate_expr->aggregate_name();
+  const auto         &aggregate_name = unbound_aggregate_expr->aggregate_name();
   AggregateExpr::Type aggregate_type;
   RC                  rc = AggregateExpr::type_from_string(aggregate_name, aggregate_type);
   if (OB_FAIL(rc)) {

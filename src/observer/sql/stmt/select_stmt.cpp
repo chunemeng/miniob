@@ -57,6 +57,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
 
     binder_context.add_table(table_name, table);
   }
+  bool should_alis = select_sql.inner_joins.size() > 0;
 
   for (auto &node : select_sql.inner_joins) {
     for (auto &cond : node.conditions) {
@@ -83,7 +84,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   ExpressionBinder               expression_binder(binder_context);
 
   for (unique_ptr<Expression> &expression : select_sql.expressions) {
-    RC rc = expression_binder.bind_expression(expression, bound_expressions);
+    RC rc = expression_binder.bind_expression(expression, bound_expressions, should_alis);
     if (OB_FAIL(rc)) {
       LOG_INFO("bind expression failed. rc=%s", strrc(rc));
       return rc;
@@ -93,7 +94,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   vector<unique_ptr<Expression>> group_by_expressions;
   for (unique_ptr<Expression> &expression : select_sql.group_by) {
     LOG_INFO("group by expression: %s", expression->name());
-    RC rc = expression_binder.bind_expression(expression, group_by_expressions);
+    RC rc = expression_binder.bind_expression(expression, group_by_expressions, should_alis);
     if (OB_FAIL(rc)) {
       LOG_INFO("bind expression failed. rc=%s", strrc(rc));
       return rc;

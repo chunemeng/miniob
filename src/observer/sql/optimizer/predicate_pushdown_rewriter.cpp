@@ -17,6 +17,51 @@ See the Mulan PSL v2 for more details. */
 #include "sql/expr/expression.h"
 #include "sql/operator/logical_operator.h"
 #include "sql/operator/table_get_logical_operator.h"
+#include "sql/operator/join_logical_operator.h"
+
+RC push_predicate_to_child(
+    std::unordered_multimap<std::string, std::unique_ptr<Expression>> &pushdown_exprs, JoinLogicalOperator *join_oper)
+{
+  // TODO:理论上expr要推到最底层的，但是这里只推到第一次出现的地方
+  // 以及只考虑了expr第一个field的名字，没有考虑多个field的情况
+  LOG_INFO("push predicate to child");
+  if (join_oper->children().size() != 2) {
+    return RC::INVALID_ARGUMENT;
+  }
+
+  RC rc = RC::SUCCESS;
+
+  auto tmp_func = [&](LogicalOperator *oper) {
+    if (oper->type() == LogicalOperatorType::TABLE_GET) {
+      auto  ch1       = dynamic_cast<TableGetLogicalOperator *>(oper);
+      auto  name      = ch1->table()->name();
+      auto  iter      = pushdown_exprs.find(name);
+      auto &predicate = ch1->predicates();
+      while (iter != pushdown_exprs.end()) {
+        predicate.emplace_back(std::move(iter->second));
+        pushdown_exprs.erase(iter);
+        iter = pushdown_exprs.find(name);
+      }
+    } else {
+      auto ch1 = dynamic_cast<JoinLogicalOperator *>(join_oper->children()[0].get());
+      rc       = push_predicate_to_child(pushdown_exprs, ch1);
+    }
+    return rc;
+  };
+  rc = tmp_func(join_oper->children()[0].get());
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to push predicate to child. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  rc = tmp_func(join_oper->children()[1].get());
+
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to push predicate to child. rc=%s", strrc(rc));
+    return rc;
+  }
+  return rc;
+}
 
 RC PredicatePushdownRewriter::rewrite(std::unique_ptr<LogicalOperator> &oper, bool &change_made)
 {
@@ -25,16 +70,49 @@ RC PredicatePushdownRewriter::rewrite(std::unique_ptr<LogicalOperator> &oper, bo
     return rc;
   }
 
+  std::unique_ptr<LogicalOperator> &child_oper = oper->children().front();
+  if (child_oper->type() != LogicalOperatorType::TABLE_GET) {
+    if (child_oper->type() != LogicalOperatorType::JOIN) {
+      return rc;
+    }
+    auto table_get_oper = dynamic_cast<JoinLogicalOperator *>(child_oper.get());
+
+    std::vector<std::unique_ptr<Expression>> &predicate_oper_exprs = oper->expressions();
+    if (predicate_oper_exprs.size() != 1) {
+      return rc;
+    }
+
+    std::unique_ptr<Expression>                                      &predicate_expr = predicate_oper_exprs.front();
+    std::unordered_multimap<std::string, std::unique_ptr<Expression>> pushdown_exprs;
+    rc = get_exprs_can_pushdown(predicate_expr, pushdown_exprs);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to get exprs can pushdown. rc=%s", strrc(rc));
+      return rc;
+    }
+
+    if (!predicate_expr || is_empty_predicate(predicate_expr)) {
+      // 所有的表达式都下推到了下层算子
+      // 这个predicate operator其实就可以不要了。但是这里没办法删除，弄一个空的表达式吧
+      LOG_TRACE("all expressions of predicate operator were pushdown to table get operator, then make a fake one");
+
+      Value value((bool)true);
+      predicate_expr = std::unique_ptr<Expression>(new ValueExpr(value));
+    }
+
+    if (!pushdown_exprs.empty()) {
+      change_made = true;
+      // the child of join operator is table get operator or another join operator
+      push_predicate_to_child(pushdown_exprs, table_get_oper);
+      ASSERT(pushdown_exprs.empty(), "pushdown_exprs should be empty");
+    }
+    return rc;
+  }
+
   if (oper->children().size() != 1) {
     return rc;
   }
 
-  std::unique_ptr<LogicalOperator> &child_oper = oper->children().front();
-  if (child_oper->type() != LogicalOperatorType::TABLE_GET) {
-    return rc;
-  }
-
-  auto table_get_oper = static_cast<TableGetLogicalOperator *>(child_oper.get());
+  auto table_get_oper = dynamic_cast<TableGetLogicalOperator *>(child_oper.get());
 
   std::vector<std::unique_ptr<Expression>> &predicate_oper_exprs = oper->expressions();
   if (predicate_oper_exprs.size() != 1) {
@@ -62,6 +140,8 @@ RC PredicatePushdownRewriter::rewrite(std::unique_ptr<LogicalOperator> &oper, bo
     change_made = true;
     table_get_oper->set_predicates(std::move(pushdown_exprs));
   }
+
+  // NOTE: 此时不再需要递归调用, 因为TableGetLogicalOperator是最底层的operator
   return rc;
 }
 
@@ -119,7 +199,7 @@ RC PredicatePushdownRewriter::get_exprs_can_pushdown(
     }
   } else if (expr->type() == ExprType::COMPARISON) {
     // 如果是比较操作，并且比较的左边或右边是表某个列值，那么就下推下去
-    auto   comparison_expr = static_cast<ComparisonExpr *>(expr.get());
+    auto comparison_expr = static_cast<ComparisonExpr *>(expr.get());
 
     std::unique_ptr<Expression> &left_expr  = comparison_expr->left();
     std::unique_ptr<Expression> &right_expr = comparison_expr->right();
@@ -133,6 +213,62 @@ RC PredicatePushdownRewriter::get_exprs_can_pushdown(
     }
 
     pushdown_exprs.emplace_back(std::move(expr));
+  }
+  return rc;
+}
+RC PredicatePushdownRewriter::get_exprs_can_pushdown(
+    unique_ptr<Expression> &expr, std::unordered_multimap<std::string, std::unique_ptr<Expression>> &pushdown_exprs)
+{
+  RC rc = RC::SUCCESS;
+  if (expr->type() == ExprType::CONJUNCTION) {
+    ConjunctionExpr *conjunction_expr = static_cast<ConjunctionExpr *>(expr.get());
+    // 或 操作的比较，太复杂，现在不考虑
+    if (conjunction_expr->conjunction_type() == ConjunctionExpr::Type::OR) {
+      LOG_WARN("unsupported or operation");
+      rc = RC::UNIMPLEMENTED;
+      return rc;
+    }
+
+    std::vector<std::unique_ptr<Expression>> &child_exprs = conjunction_expr->children();
+    for (auto iter = child_exprs.begin(); iter != child_exprs.end();) {
+      // 对每个子表达式，判断是否可以下放到table get 算子
+      // 如果可以的话，就从当前孩子节点中删除他
+      rc = get_exprs_can_pushdown(*iter, pushdown_exprs);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("failed to get pushdown expressions. rc=%s", strrc(rc));
+        return rc;
+      }
+
+      if (!*iter) {
+        child_exprs.erase(iter);
+      } else {
+        ++iter;
+      }
+    }
+  } else if (expr->type() == ExprType::COMPARISON) {
+    // 如果是比较操作，并且比较的左边或右边是表某个列值，那么就下推下去
+    auto comparison_expr = static_cast<ComparisonExpr *>(expr.get());
+
+    std::unique_ptr<Expression> &left_expr      = comparison_expr->left();
+    std::unique_ptr<Expression> &right_expr     = comparison_expr->right();
+    bool                         is_left_field  = left_expr->type() == ExprType::FIELD;
+    bool                         is_right_field = right_expr->type() == ExprType::FIELD;
+    // 比较操作的左右两边只要有一个是取列字段值的并且另一边也是取字段值或常量，就pushdown
+    if (is_left_field && is_right_field) {
+      return rc;
+    }
+    if (!is_left_field && right_expr->type() != ExprType::FIELD) {
+      return rc;
+    }
+    if (left_expr->type() != ExprType::FIELD && left_expr->type() != ExprType::VALUE &&
+        right_expr->type() != ExprType::FIELD && right_expr->type() != ExprType::VALUE) {
+      return rc;
+    }
+    auto name =
+        (is_left_field ? dynamic_cast<FieldExpr *>(left_expr.get()) : dynamic_cast<FieldExpr *>(right_expr.get()))
+            ->field_name();
+
+    pushdown_exprs.emplace(name, std::move(expr));
   }
   return rc;
 }

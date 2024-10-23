@@ -296,7 +296,7 @@ int TableMeta::deserialize(std::istream &is)
   record_size_ = fields_.back().offset() + fields_.back().len() - fields_.begin()->offset();
 
   for (const FieldMeta &field_meta : fields_) {
-    if (!field_meta.visible() && field_meta.name() == "__null") {
+    if (!field_meta.visible() && field_meta.name() != "__null") {
       trx_fields_.push_back(field_meta);  // 字段加上trx标识更好
     }
   }

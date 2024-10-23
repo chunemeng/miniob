@@ -43,7 +43,11 @@ TupleCellSpec::TupleCellSpec(const string &table_name, const string &field_name,
   if (alias) {
     alias_ = alias;
   } else {
-    alias_ = table_name_ + "." + field_name_;
+    if (table_name_.empty()) {
+      alias_ = field_name_;
+    } else {
+      alias_ = table_name_ + "." + field_name_;
+    }
   }
 }
 

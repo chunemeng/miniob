@@ -16,6 +16,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/optimizer/rewrite_rule.h"
 #include <vector>
+#include <unordered_map>
 
 /**
  * @brief 将一些谓词表达式下推到表数据扫描中
@@ -33,5 +34,7 @@ public:
 private:
   RC get_exprs_can_pushdown(
       std::unique_ptr<Expression> &expr, std::vector<std::unique_ptr<Expression>> &pushdown_exprs);
+  RC get_exprs_can_pushdown(
+      std::unique_ptr<Expression> &expr, std::unordered_multimap<std::string, std::unique_ptr<Expression>> &pushdown_exprs);
   bool is_empty_predicate(std::unique_ptr<Expression> &expr);
 };
