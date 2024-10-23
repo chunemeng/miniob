@@ -481,7 +481,6 @@ public:
 
 public:
   static RC type_from_string(const char *type_str, Type &type);
-  static RC type_from_string(const std::string &type_str, Type &type);
 
 private:
   Type                        aggregate_type_;

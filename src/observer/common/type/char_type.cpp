@@ -30,6 +30,32 @@ RC CharType::set_value_from_str(Value &val, const string &data) const
 RC CharType::cast_to(const Value &val, AttrType type, Value &result) const
 {
   switch (type) {
+    case AttrType::FLOATS: {
+      char  *end;
+      auto   str        = val.value_.pointer_value_;
+      double val_d      = strtod(str, &end);
+      result.attr_type_ = AttrType::FLOATS;
+
+      if (end != str) {
+        result.value_.float_value_ = static_cast<float >(val_d);
+      } else {
+        result.value_.float_value_ = 0;
+      }
+    } break;
+    case AttrType::INTS: {
+      char  *end;
+      auto   str        = val.value_.pointer_value_;
+      double val_d      = strtod(str, &end);
+      result.attr_type_ = AttrType::INTS;
+
+      if (end != str) {
+        result.value_.int_value_ = static_cast<int>(lround(val_d));
+      } else {
+        result.value_.int_value_ = 0;
+      }
+    }
+
+    break;
     case AttrType::DATES:
       int y, m, d;
       if (sscanf(val.value_.pointer_value_, "%d-%d-%d", &y, &m, &d) != 3) {
@@ -51,6 +77,7 @@ int CharType::cast_cost(AttrType type)
 {
   switch (type) {
     case AttrType::CHARS: return 0;
+    case AttrType::INTS:
     case AttrType::DATES: return 1;
     default: return INT32_MAX;
   }
