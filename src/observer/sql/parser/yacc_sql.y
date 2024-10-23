@@ -140,6 +140,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         TRX_COMMIT
         TRX_ROLLBACK
         INT_T
+        VECTOR_T
         STRING_T
         DATE_T
         FLOAT_T

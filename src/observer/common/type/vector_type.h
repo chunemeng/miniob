@@ -29,4 +29,7 @@ public:
   RC multiply(const Value &left, const Value &right, Value &result) const override { return RC::UNIMPLEMENTED; }
 
   RC to_string(const Value &val, string &result) const override { return RC::UNIMPLEMENTED; }
+
+private:
+  std::vector<int> value_;
 };
