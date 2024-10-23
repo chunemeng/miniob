@@ -267,7 +267,7 @@ RC Table::update_record(Record &record, const FieldMeta *field_meta, Value *valu
         break;
       }
       ASSERT(value_num <= 32, "can't support more than 32 fields");
-      null_map[0] |= (1 << i);
+      null_map[0] |= (1 << (field->field_id()));
     } else {
       if (field->type() != value.attr_type()) {
         Value real_value;
