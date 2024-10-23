@@ -584,27 +584,25 @@ unique_ptr<Aggregator> AggregateExpr::create_aggregator() const
 {
   unique_ptr<Aggregator> aggregator;
   Value                  value;
-  RC                     rc      = child_->try_get_value(value);
-  bool                   is_null = rc == RC::SUCCESS && value.attr_type() == AttrType::NULLS;
   switch (aggregate_type_) {
     case Type::SUM: {
-      aggregator = make_unique<SumAggregator>(is_null);
+      aggregator = make_unique<SumAggregator>();
       break;
     }
     case Type::COUNT: {
-      aggregator = make_unique<CountAggregator>(is_null);
+      aggregator = make_unique<CountAggregator>();
       break;
     }
     case Type::AVG: {
-      aggregator = make_unique<AvgAggregator>(is_null);
+      aggregator = make_unique<AvgAggregator>();
       break;
     }
     case Type::MAX: {
-      aggregator = make_unique<MaxAggregator>(is_null);
+      aggregator = make_unique<MaxAggregator>();
       break;
     }
     case Type::MIN: {
-      aggregator = make_unique<MinAggregator>(is_null);
+      aggregator = make_unique<MinAggregator>();
       break;
     }
     default: {
