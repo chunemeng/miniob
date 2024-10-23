@@ -210,6 +210,12 @@ void Value::set_value(const Value &value)
     case AttrType::BOOLEANS: {
       set_boolean(value.get_boolean());
     } break;
+    case AttrType::NULLS: {
+      set_null();
+    } break;
+    case AttrType::DATES: {
+      set_date(value.get_int() / 10000, (value.get_int() % 10000) / 100, value.get_int() % 100);
+    } break;
 
     default: {
       ASSERT(false, "got an invalid value type");
