@@ -424,7 +424,8 @@ RC check_aggregate_expression(AggregateExpr &expression)
     case AggregateExpr::Type::SUM:
     case AggregateExpr::Type::AVG: {
       // 仅支持数值类型
-      if (child_value_type != AttrType::INTS && child_value_type != AttrType::FLOATS) {
+      if (child_value_type != AttrType::INTS && child_value_type != AttrType::FLOATS &&
+          child_value_type != AttrType::NULLS) {
         LOG_WARN("invalid child value type for aggregate expression: %d", static_cast<int>(child_value_type));
         return RC::INVALID_ARGUMENT;
       }

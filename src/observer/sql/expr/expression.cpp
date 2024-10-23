@@ -133,7 +133,7 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
         return RC::INVALID_ARGUMENT;
       }
       bool is_null = left.attr_type() == AttrType::NULLS;
-      result = (comp_ == IS_C) ? is_null : !is_null;
+      result       = (comp_ == IS_C) ? is_null : !is_null;
     } else {
       result = false;
     }
@@ -166,13 +166,13 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
       result = (left.compare_like(right) != 0);
     } break;
 
-  default: {
-    LOG_WARN("unsupported comparison. %d", comp_);
-    rc = RC::INTERNAL;
-  } break;
-}
+    default: {
+      LOG_WARN("unsupported comparison. %d", comp_);
+      rc = RC::INTERNAL;
+    } break;
+  }
 
-return rc;
+  return rc;
 }
 
 RC ComparisonExpr::try_get_value(Value &cell) const
@@ -583,25 +583,28 @@ bool AggregateExpr::equal(const Expression &other) const
 unique_ptr<Aggregator> AggregateExpr::create_aggregator() const
 {
   unique_ptr<Aggregator> aggregator;
+  Value                  value;
+  RC                     rc      = child_->try_get_value(value);
+  bool                   is_null = rc == RC::SUCCESS && value.attr_type() == AttrType::NULLS;
   switch (aggregate_type_) {
     case Type::SUM: {
-      aggregator = make_unique<SumAggregator>();
+      aggregator = make_unique<SumAggregator>(is_null);
       break;
     }
     case Type::COUNT: {
-      aggregator = make_unique<CountAggregator>();
+      aggregator = make_unique<CountAggregator>(is_null);
       break;
     }
     case Type::AVG: {
-      aggregator = make_unique<AvgAggregator>();
+      aggregator = make_unique<AvgAggregator>(is_null);
       break;
     }
     case Type::MAX: {
-      aggregator = make_unique<MaxAggregator>();
+      aggregator = make_unique<MaxAggregator>(is_null);
       break;
     }
     case Type::MIN: {
-      aggregator = make_unique<MinAggregator>();
+      aggregator = make_unique<MinAggregator>(is_null);
       break;
     }
     default: {
