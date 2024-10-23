@@ -157,6 +157,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         COUNT
         WHERE
         NOT
+        IS
         LIKE
         AND
         SET
@@ -810,6 +811,8 @@ comp_op:
     | LE { $$ = LESS_EQUAL; }
     | GE { $$ = GREAT_EQUAL; }
     | NE { $$ = NOT_EQUAL; }
+    | IS NOT {$$ = IS_NOT_C;}
+    | IS { $$ = IS_C;}
     | NOT LIKE  { $$ = NOT_LIKE; }
     | LIKE { $$ = LIKE_OP; }
     ;

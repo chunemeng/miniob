@@ -26,4 +26,9 @@ RC NULLType::divide(const Value &left, const Value &right, Value &result) const
   result.set_null();
   return RC::SUCCESS;
 }
-
+int NULLType::compare(const Value &left, const Value &right) const {
+  if (right.attr_type() == AttrType::NULLS) {
+    return 0;
+  }
+  return INT32_MAX;
+}

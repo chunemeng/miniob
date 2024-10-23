@@ -127,6 +127,16 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
   result = false;
 
   if (left.attr_type() == AttrType::NULLS || right.attr_type() == AttrType::NULLS) {
+    if (comp_ == IS_C || comp_ == IS_NOT_C) {
+      if (right.attr_type() != AttrType::NULLS) {
+        LOG_WARN("right value is not NULL");
+        return RC::INVALID_ARGUMENT;
+      }
+      bool is_null = left.attr_type() == AttrType::NULLS;
+      result = (comp_ == IS_C) ? is_null : !is_null;
+    } else {
+      result = false;
+    }
     return rc;
   }
 
@@ -156,13 +166,13 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
       result = (left.compare_like(right) != 0);
     } break;
 
-    default: {
-      LOG_WARN("unsupported comparison. %d", comp_);
-      rc = RC::INTERNAL;
-    } break;
-  }
+  default: {
+    LOG_WARN("unsupported comparison. %d", comp_);
+    rc = RC::INTERNAL;
+  } break;
+}
 
-  return rc;
+return rc;
 }
 
 RC ComparisonExpr::try_get_value(Value &cell) const
