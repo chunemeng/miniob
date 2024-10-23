@@ -80,6 +80,7 @@ RC GroupByPhysicalOperator::evaluate(GroupValueType &group_value)
     aggregator_names.emplace_back(expr->name());
   }
 
+  LOG_INFO("aggregator names:");
   AggregatorList &aggregators           = get<0>(group_value);
   CompositeTuple &composite_value_tuple = get<1>(group_value);
 
