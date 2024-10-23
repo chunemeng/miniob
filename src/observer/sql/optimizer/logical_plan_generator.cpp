@@ -95,10 +95,9 @@ RC LogicalPlanGenerator::create_plan(CalcStmt *calc_stmt, std::unique_ptr<Logica
 
 RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<LogicalOperator> &logical_operator)
 {
-  unique_ptr<LogicalOperator> *last_oper = nullptr;
 
-  unique_ptr<LogicalOperator> table_oper(nullptr);
-  last_oper = &table_oper;
+  unique_ptr<LogicalOperator>  table_oper(nullptr);
+  unique_ptr<LogicalOperator> *last_oper = &table_oper;
 
   const auto &tables = select_stmt->tables();
   for (const std::pair<const std::string &, Table *> pair : tables) {
