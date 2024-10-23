@@ -74,7 +74,7 @@ RC AvgAggregator::accumulate(const Value &value)
 RC AvgAggregator::evaluate(Value &result)
 {
   if (count_ == 0) {
-    result.set_value(value_);
+    result = value_;
     return RC::SUCCESS;
   }
 
