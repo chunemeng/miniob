@@ -49,7 +49,7 @@ RC ExpressionRewriter::rewrite(unique_ptr<LogicalOperator> &oper, bool &change_m
 
   vector<unique_ptr<LogicalOperator>> &child_opers = oper->children();
   for (unique_ptr<LogicalOperator> &child_oper : child_opers) {
-    bool sub_change_made = false;
+    sub_change_made = false;
     rc                   = rewrite(child_oper, sub_change_made);
     if (sub_change_made && !change_made) {
       change_made = true;
@@ -99,7 +99,6 @@ RC ExpressionRewriter::rewrite_expression(unique_ptr<Expression> &expr, bool &ch
 
       unique_ptr<Expression> &left_expr       = comparison_expr->left();
       unique_ptr<Expression> &right_expr      = comparison_expr->right();
-
       bool left_change_made = false;
 
       rc                    = rewrite_expression(left_expr, left_change_made);

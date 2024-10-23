@@ -64,7 +64,7 @@ public:
 
     rc = RC::NOTFOUND;
     for (const ExprPointerType &expression : expressions_) {
-      if (0 == strcmp(spec.alias(), expression->name())) {
+      if (spec.alias_str() == expression->name()) {
         rc = get_value(expression, cell);
         break;
       }

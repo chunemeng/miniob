@@ -58,6 +58,26 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     binder_context.add_table(table_name, table);
   }
 
+  for (auto &node : select_sql.inner_joins) {
+    for (auto &cond : node.conditions) {
+      select_sql.conditions.emplace_back(cond);
+    }
+
+    const char *table_name = node.relation_name.c_str();
+    if (nullptr == table_name) {
+      LOG_WARN("invalid argument. relation name is null.");
+      return RC::INVALID_ARGUMENT;
+    }
+
+    Table *table = db->find_table(table_name);
+    if (nullptr == table) {
+      LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
+      return RC::SCHEMA_TABLE_NOT_EXIST;
+    }
+
+    binder_context.add_table(table_name, table);
+  }
+
   // collect query fields in `select` statement
   vector<unique_ptr<Expression>> bound_expressions;
   ExpressionBinder               expression_binder(binder_context);

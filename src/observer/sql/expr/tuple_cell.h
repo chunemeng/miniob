@@ -22,12 +22,15 @@ class TupleCellSpec final
 public:
   TupleCellSpec() = default;
   TupleCellSpec(const char *table_name, const char *field_name, const char *alias = nullptr);
+  TupleCellSpec(const std::string &table_name, const std::string &field_name, const char *alias = nullptr);
   explicit TupleCellSpec(const char *alias);
   explicit TupleCellSpec(const std::string &alias);
 
-  const char *table_name() const { return table_name_.c_str(); }
-  const char *field_name() const { return field_name_.c_str(); }
-  const char *alias() const { return alias_.c_str(); }
+  const char* table_name() const { return table_name_.c_str(); }
+  const std::string &table_name_str() const { return table_name_; }
+  const std::string &field_name() const { return field_name_; }
+  const char        *alias() const { return alias_.c_str(); }
+  const std::string &alias_str() const { return alias_; }
 
   bool equals(const TupleCellSpec &other) const
   {

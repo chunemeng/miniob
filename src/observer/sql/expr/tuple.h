@@ -220,16 +220,16 @@ public:
 
   RC find_cell(const TupleCellSpec &spec, Value &cell) const override
   {
-    const char *table_name = spec.table_name();
-    const char *field_name = spec.field_name();
-    if (0 != strcmp(table_name, table_->name())) {
+    const auto& table_name = spec.table_name_str();
+    const auto& field_name = spec.field_name();
+    if (table_name != table_->name()) {
       return RC::NOTFOUND;
     }
 
     for (size_t i = 0; i < speces_.size(); ++i) {
       const FieldExpr *field_expr = speces_[i];
       const Field     &field      = field_expr->field();
-      if (0 == strcmp(field_name, field.field_name())) {
+      if (field_name == field.field_name()) {
         return cell_at(i, cell);
       }
     }

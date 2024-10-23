@@ -47,6 +47,7 @@ enum class ExprType
   COMPARISON,   ///< 需要做比较的表达式
   CONJUNCTION,  ///< 多个表达式使用同一种关系(AND或OR)来联结
   ARITHMETIC,   ///< 算术运算
+  SUBQUERY,     ///< 子查询
   AGGREGATION,  ///< 聚合运算
 };
 
@@ -110,7 +111,7 @@ public:
    * @brief 表达式的名字，比如是字段名称，或者用户在执行SQL语句时输入的内容
    */
   virtual const char *name() const { return name_.c_str(); }
-  virtual void        set_name(std::string name) { name_ = name; }
+  virtual void        set_name(const std::string &name) { name_ = name; }
 
   /**
    * @brief 表达式在下层算子返回的 chunk 中的位置
@@ -148,7 +149,7 @@ public:
 
   RC get_value(const Tuple &tuple, Value &value) const override { return RC::UNIMPLEMENTED; }  // 不需要实现
 
-  const char *table_name() const { return table_name_.c_str(); }
+  const std::string &table_name() const { return table_name_; }
 
 private:
   std::string table_name_;
@@ -168,8 +169,8 @@ public:
 
   RC get_value(const Tuple &tuple, Value &value) const override { return RC::INTERNAL; }
 
-  const char *table_name() const { return table_name_.c_str(); }
-  const char *field_name() const { return field_name_.c_str(); }
+  const std::string &table_name() const { return table_name_; }
+  const std::string &field_name() const { return field_name_; }
 
 private:
   std::string table_name_;
@@ -199,8 +200,8 @@ public:
 
   const Field &field() const { return field_; }
 
-  const char *table_name() const { return field_.table_name(); }
-  const char *field_name() const { return field_.field_name(); }
+  const std::string &table_name() const { return field_.table_name(); }
+  const std::string &field_name() const { return field_.field_name(); }
 
   RC get_column(Chunk &chunk, Column &column) override;
 
@@ -349,6 +350,20 @@ private:
   std::vector<std::unique_ptr<Expression>> children_;
 };
 
+class SubqueryExpr : public Expression
+{
+public:
+  SubqueryExpr()          = default;
+  virtual ~SubqueryExpr() = default;
+
+  ExprType type() const override { return ExprType::SUBQUERY; }
+  AttrType value_type() const override { return AttrType::UNDEFINED; }
+
+  RC get_value(const Tuple &tuple, Value &value) const override { return RC::INTERNAL; }
+
+  const char *name() const override { return "SubqueryExpr"; }
+};
+
 /**
  * @brief 算术表达式
  * @ingroup Expression
@@ -411,12 +426,12 @@ class UnboundAggregateExpr : public Expression
 {
 public:
   UnboundAggregateExpr(const char *aggregate_name, Expression *child);
-  UnboundAggregateExpr(const char* aggregate_name, std::unique_ptr<Expression> child);
+  UnboundAggregateExpr(const char *aggregate_name, std::unique_ptr<Expression> child);
   virtual ~UnboundAggregateExpr() = default;
 
   ExprType type() const override { return ExprType::UNBOUND_AGGREGATION; }
 
-  const char *aggregate_name() const { return aggregate_name_.c_str(); }
+  const std::string &aggregate_name() const { return aggregate_name_; }
 
   std::unique_ptr<Expression> &child() { return child_; }
 
@@ -466,6 +481,7 @@ public:
 
 public:
   static RC type_from_string(const char *type_str, Type &type);
+  static RC type_from_string(const std::string &type_str, Type &type);
 
 private:
   Type                        aggregate_type_;

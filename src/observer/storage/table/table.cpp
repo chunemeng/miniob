@@ -49,7 +49,7 @@ Table::~Table()
   }
   indexes_.clear();
 
-  LOG_INFO("Table has been closed: %s", name());
+  LOG_INFO("Table has been closed: %s", name().c_str());
 }
 
 RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, const char *base_dir,
@@ -198,7 +198,7 @@ RC Table::open(Db *db, const char *meta_file, const char *base_dir)
     const FieldMeta *field_meta = table_meta_.field(index_meta->field());
     if (field_meta == nullptr) {
       LOG_ERROR("Found invalid index meta info which has a non-exists field. table=%s, index=%s, field=%s",
-                name(), index_meta->name(), index_meta->field());
+                name().c_str(), index_meta->name(), index_meta->field());
       // skip cleanup
       //  do all cleanup action in destructive Table function
       return RC::INTERNAL;
@@ -211,7 +211,7 @@ RC Table::open(Db *db, const char *meta_file, const char *base_dir)
     if (rc != RC::SUCCESS) {
       delete index;
       LOG_ERROR("Failed to open index. table=%s, index=%s, file=%s, rc=%s",
-                name(), index_meta->name(), index_file.c_str(), strrc(rc));
+                name().c_str(), index_meta->name(), index_file.c_str(), strrc(rc));
       // skip cleanup
       //  do all cleanup action in destructive Table function.
       return rc;
@@ -236,12 +236,12 @@ RC Table::insert_record(Record &record)
     RC rc2 = delete_entry_of_indexes(record.data(), record.rid(), false /*error_on_not_exists*/);
     if (rc2 != RC::SUCCESS) {
       LOG_ERROR("Failed to rollback index data when insert index entries failed. table name=%s, rc=%d:%s",
-                name(), rc2, strrc(rc2));
+                name().c_str(), rc2, strrc(rc2));
     }
     rc2 = record_handler_->delete_record(&record.rid());
     if (rc2 != RC::SUCCESS) {
       LOG_PANIC("Failed to rollback record data when insert index entries failed. table name=%s, rc=%d:%s",
-                name(), rc2, strrc(rc2));
+                name().c_str(), rc2, strrc(rc2));
     }
   }
   return rc;
@@ -262,7 +262,7 @@ RC Table::update_record(Record &record, const FieldMeta *field_meta, Value *valu
     if (value.attr_type() == AttrType::NULLS) {
       if (!field->nullable()) {
         LOG_WARN("insert null into not nullable field. table name:%s,field name:%s,value:%s ",
-            table_meta_.name(), field->name(), value.to_string().c_str());
+            table_meta_.name(), field->name().c_str(), value.to_string().c_str());
         rc = RC::INVALID_ARGUMENT;
         break;
       }
@@ -274,7 +274,7 @@ RC Table::update_record(Record &record, const FieldMeta *field_meta, Value *valu
         rc = Value::cast_to(value, field->type(), real_value);
         if (OB_FAIL(rc)) {
           LOG_WARN("failed to cast value. table name:%s,field name:%s,value:%s ",
-            table_meta_.name(), field->name(), value.to_string().c_str());
+            table_meta_.name(), field->name().c_str(), value.to_string().c_str());
           break;
         }
         rc = set_value_to_record(data, real_value, field);
@@ -295,13 +295,13 @@ RC Table::update_record(Record &record, const FieldMeta *field_meta, Value *valu
   RC rc2 = delete_record(record);
   if (rc2 != RC::SUCCESS) {
     LOG_ERROR("Failed to rollback index data when insert index entries failed. table name=%s, rc=%d:%s",
-                name(), rc2, strrc(rc2));
+                name().c_str(), rc2, strrc(rc2));
   }
 
   rc2 = insert_record(new_record);
   if (rc2 != RC::SUCCESS) {
     LOG_PANIC("Failed to rollback record data when insert index entries failed. table name=%s, rc=%d:%s",
-                name(), rc2, strrc(rc2));
+                name().c_str(), rc2, strrc(rc2));
   }
 
   return rc;
@@ -316,7 +316,7 @@ RC Table::get_record(const RID &rid, Record &record)
 {
   RC rc = record_handler_->get_record(rid, record);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to visit record. rid=%s, table=%s, rc=%s", rid.to_string().c_str(), name(), strrc(rc));
+    LOG_WARN("failed to visit record. rid=%s, table=%s, rc=%s", rid.to_string().c_str(), name().c_str(), strrc(rc));
     return rc;
   }
 
@@ -337,18 +337,18 @@ RC Table::recover_insert_record(Record &record)
     RC rc2 = delete_entry_of_indexes(record.data(), record.rid(), false /*error_on_not_exists*/);
     if (rc2 != RC::SUCCESS) {
       LOG_ERROR("Failed to rollback index data when insert index entries failed. table name=%s, rc=%d:%s",
-                name(), rc2, strrc(rc2));
+                name().c_str(), rc2, strrc(rc2));
     }
     rc2 = record_handler_->delete_record(&record.rid());
     if (rc2 != RC::SUCCESS) {
       LOG_PANIC("Failed to rollback record data when insert index entries failed. table name=%s, rc=%d:%s",
-                name(), rc2, strrc(rc2));
+                name().c_str(), rc2, strrc(rc2));
     }
   }
   return rc;
 }
 
-const char *Table::name() const { return table_meta_.name(); }
+const std::string &Table::name() const { return table_meta_.name_str(); }
 
 const TableMeta &Table::table_meta() const { return table_meta_; }
 
@@ -377,7 +377,7 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
     if (value.attr_type() == AttrType::NULLS) {
       if (!field->nullable()) {
         LOG_WARN("insert null into not nullable field. table name:%s,field name:%s,value:%s ",
-            table_meta_.name(), field->name(), value.to_string().c_str());
+            table_meta_.name(), field->name().c_str(), value.to_string().c_str());
         rc = RC::INVALID_ARGUMENT;
         break;
       }
@@ -389,7 +389,7 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
         rc = Value::cast_to(value, field->type(), real_value);
         if (OB_FAIL(rc)) {
           LOG_WARN("failed to cast value. table name:%s,field name:%s,value:%s ",
-            table_meta_.name(), field->name(), value.to_string().c_str());
+            table_meta_.name(), field->name().c_str(), value.to_string().c_str());
           break;
         }
         rc = set_value_to_record(record_data, real_value, field);
@@ -469,7 +469,7 @@ RC Table::get_chunk_scanner(ChunkFileScanner &scanner, Trx *trx, ReadWriteMode m
 RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_name)
 {
   if (common::is_blank(index_name) || nullptr == field_meta) {
-    LOG_INFO("Invalid input arguments, table name is %s, index_name is blank or attribute_name is blank", name());
+    LOG_INFO("Invalid input arguments, table name is %s, index_name is blank or attribute_name is blank", name().c_str());
     return RC::INVALID_ARGUMENT;
   }
 
@@ -478,7 +478,7 @@ RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_
   RC rc = new_index_meta.init(index_name, *field_meta);
   if (rc != RC::SUCCESS) {
     LOG_INFO("Failed to init IndexMeta in table:%s, index_name:%s, field_name:%s", 
-             name(), index_name, field_meta->name());
+             name().c_str(), index_name, field_meta->name().c_str());
     return rc;
   }
 
@@ -498,7 +498,7 @@ RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_
   rc = get_record_scanner(scanner, trx, ReadWriteMode::READ_ONLY);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to create scanner while creating index. table=%s, index=%s, rc=%s", 
-             name(), index_name, strrc(rc));
+             name().c_str(), index_name, strrc(rc));
     return rc;
   }
 
@@ -507,7 +507,7 @@ RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_
     rc = index->insert_entry(record.data(), &record.rid());
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to insert record into index while creating index. table=%s, index=%s, rc=%s",
-               name(), index_name, strrc(rc));
+               name().c_str(), index_name, strrc(rc));
       return rc;
     }
   }
@@ -515,11 +515,11 @@ RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_
     rc = RC::SUCCESS;
   } else {
     LOG_WARN("failed to insert record into index while creating index. table=%s, index=%s, rc=%s",
-             name(), index_name, strrc(rc));
+             name().c_str(), index_name, strrc(rc));
     return rc;
   }
   scanner.close_scan();
-  LOG_INFO("inserted all records into new index. table=%s, index=%s", name(), index_name);
+  LOG_INFO("inserted all records into new index. table=%s, index=%s", name().c_str(), index_name);
 
   indexes_.push_back(index);
 
@@ -527,7 +527,7 @@ RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_
   TableMeta new_table_meta(table_meta_);
   rc = new_table_meta.add_index(new_index_meta);
   if (rc != RC::SUCCESS) {
-    LOG_ERROR("Failed to add index (%s) on table (%s). error=%d:%s", index_name, name(), rc, strrc(rc));
+    LOG_ERROR("Failed to add index (%s) on table (%s). error=%d:%s", index_name, name().c_str(), rc, strrc(rc));
     return rc;
   }
 
@@ -554,13 +554,13 @@ RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_
   if (ret != 0) {
     LOG_ERROR("Failed to rename tmp meta file (%s) to normal meta file (%s) while creating index (%s) on table (%s). "
               "system error=%d:%s",
-              tmp_file.c_str(), meta_file.c_str(), index_name, name(), errno, strerror(errno));
+              tmp_file.c_str(), meta_file.c_str(), index_name, name().c_str(), errno, strerror(errno));
     return RC::IOERR_WRITE;
   }
 
   table_meta_.swap(new_table_meta);
 
-  LOG_INFO("Successfully added a new index (%s) on the table (%s)", index_name, name());
+  LOG_INFO("Successfully added a new index (%s) on the table (%s)", index_name, name().c_str());
   return rc;
 }
 
@@ -641,7 +641,7 @@ RC Table::sync()
     rc = index->sync();
     if (rc != RC::SUCCESS) {
       LOG_ERROR("Failed to flush index's pages. table=%s, index=%s, rc=%d:%s",
-          name(),
+          name().c_str(),
           index->index_meta().name(),
           rc,
           strrc(rc));
@@ -650,6 +650,6 @@ RC Table::sync()
   }
 
   rc = data_buffer_pool_->flush_all_pages();
-  LOG_INFO("Sync table over. table=%s", name());
+  LOG_INFO("Sync table over. table=%s", name().c_str());
   return rc;
 }

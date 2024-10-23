@@ -372,7 +372,7 @@ RC MvccTrx::rollback()
             continue;
           } else {
             LOG_WARN("failed to get record while rollback. table=%s, rid=%s, rc=%s", 
-                     table->name(), rid.to_string().c_str(), strrc(rc));
+                     table->name().c_str(), rid.to_string().c_str(), strrc(rc));
             return rc;
           }
         }
