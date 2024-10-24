@@ -121,6 +121,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         BY
         CREATE
         DROP
+        LBRACKET
+        RBRACKET
         GROUP
         TABLE
         TABLES
@@ -196,6 +198,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   std::vector<ConditionSqlNode> *            condition_list;
   std::vector<RelAttrSqlNode> *              rel_attr_list;
   std::vector<std::string> *                 relation_list;
+  std::vector<float> *                       vec_list;
   char *                                     string;
   int                                        number;
   float                                      floats;
@@ -210,6 +213,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 /** type 定义了各种解析后的结果输出的是什么类型。类型对应了 union 中的定义的成员变量名称 **/
 %type <number>              type
 %type <condition>           condition
+%type <vec_list>            v_list
+%type <vec_list>            v_l
 %type <value>               value
 %type <number>              number
 %type <number>              null_t
@@ -520,7 +525,38 @@ value:
       free(tmp);
       free($1);
     }
+    | v_list {
+      std::reverse($1->begin(), $1->end());
+      $$ = new Value(*$1);
+
+      delete $1;
+    }
     ;
+    v_list:
+    LBRACKET v_l RBRACKET {
+      $$ = $2;
+    }
+    ;
+    v_l:
+    FLOAT COMMA v_l {
+      $$ = $3;
+      $$->push_back($1);
+    }
+    | FLOAT {
+      $$ = new std::vector<float>;
+      $$->push_back($1);
+    }
+    | NUMBER {
+      $$ = new std::vector<float>;
+      $$->push_back($1);
+    }
+    | NUMBER COMMA v_l {
+      $$ = $3;
+      $$->push_back($1);
+    }
+    ;
+
+
 storage_format:
     /* empty */
     {

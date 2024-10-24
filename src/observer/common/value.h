@@ -49,6 +49,7 @@ public:
   explicit Value(float val);
   explicit Value(bool val);
   explicit Value(const char *s, int len = 0);
+  explicit Value(std::vector<float> &vec);
 
   Value(const Value &other);
   Value(Value &&other);
@@ -128,6 +129,13 @@ public:
   string get_string() const;
   bool   get_boolean() const;
   float *get_vector() const;
+  void   ref_vector(const Value &value)
+  {
+    own_data_            = false;
+    attr_type_           = AttrType::VECTORS;
+    value_.vector_value_ = value.value_.vector_value_;
+    length_              = value.length_;
+  }
 
 private:
   void set_vec_from_other(const Value &other);

@@ -410,9 +410,10 @@ bool Value::get_boolean() const
 void Value::set_vec_from_other(const Value &other)
 {
   ASSERT(attr_type_ == AttrType::VECTORS, "attr type is not VECTORS");
-  if (own_data_ && other.value_.vector_value_ != nullptr && length_ != 0) {
+  if (own_data_ && other.value_.vector_value_ != nullptr) {
     this->value_.vector_value_ = new float[this->length_];
-    memcpy(this->value_.vector_value_, other.value_.vector_value_, this->length_);
+    memcpy(this->value_.vector_value_, other.value_.vector_value_, this->length_ * sizeof(float));
   }
 }
 float *Value::get_vector() const { return value_.vector_value_; }
+Value::Value(vector<float> &vec) { set_vector(vec); }

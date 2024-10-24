@@ -12,29 +12,19 @@ float round(float var)
 
 RC VectorType::add(const Value &left, const Value &right, Value &result) const
 {
-  int len;
-  if (right.attr_type() == AttrType::CHARS) {
-    Value::cast_to(right, AttrType::VECTORS, result);
-    if ((len = left.length_) != result.length_) {
-      return RC::INVALID_ARGUMENT;
-    }
-    auto left_vec   = left.get_vector();
-    auto right_vec  = result.get_vector();
-    auto result_vec = result.get_vector();
-    for (int i = 0; i < len; i++) {
-      result_vec[i] = round(left_vec[i] + right_vec[i]);
-    }
+  int   len;
+  Value l, r;
+  Value::cast_to(left, AttrType::VECTORS, l);
+  Value::cast_to(right, AttrType::VECTORS, r);
 
-    return RC::SUCCESS;
-  }
-
-  if ((len = left.length_) != right.length_) {
+  if ((len = l.length_) != r.length_) {
     return RC::INVALID_ARGUMENT;
   }
-  auto   left_vec   = left.get_vector();
-  auto   right_vec  = right.get_vector();
+  auto   left_vec   = l.get_vector();
+  auto   right_vec  = r.get_vector();
   float *result_vec = new float[len];
   for (int i = 0; i < len; i++) {
+    LOG_INFO("left_vec[%d]: %f, right_vec[%d]: %f", i, left_vec[i], i, right_vec[i]);
     result_vec[i] = round(left_vec[i] + right_vec[i]);
   }
   result.set_vector(result_vec, len);
@@ -43,61 +33,38 @@ RC VectorType::add(const Value &left, const Value &right, Value &result) const
 }
 RC VectorType::subtract(const Value &left, const Value &right, Value &result) const
 {
-  int len;
-  if (right.attr_type() == AttrType::CHARS) {
-    Value::cast_to(right, AttrType::VECTORS, result);
-    if ((len = left.length_) != result.length_) {
-      return RC::INVALID_ARGUMENT;
-    }
-    auto left_vec   = left.get_vector();
-    auto right_vec  = result.get_vector();
-    auto result_vec = result.get_vector();
-    for (int i = 0; i < len; i++) {
-      result_vec[i] = round(left_vec[i] - right_vec[i]);
-    }
+  int   len;
+  Value l, r;
+  Value::cast_to(left, AttrType::VECTORS, l);
+  Value::cast_to(right, AttrType::VECTORS, r);
 
-    return RC::SUCCESS;
-  }
-
-  if ((len = left.length_) != right.length_) {
+  if ((len = l.length_) != r.length_) {
     return RC::INVALID_ARGUMENT;
   }
-  auto left_vec  = left.get_vector();
-  auto right_vec = right.get_vector();
-
-  auto result_vec = result.get_vector();
+  auto left_vec   = l.get_vector();
+  auto right_vec  = r.get_vector();
+  auto result_vec = new float[len];
 
   for (int i = 0; i < len; i++) {
     result_vec[i] = round(left_vec[i] - right_vec[i]);
   }
+  result.set_vector(result_vec, len);
 
   return RC::SUCCESS;
 }
 
 RC VectorType::multiply(const Value &left, const Value &right, Value &result) const
 {
-  int len;
-  if (right.attr_type() == AttrType::CHARS) {
-    Value::cast_to(right, AttrType::VECTORS, result);
-    if ((len = left.length_) != result.length_) {
-      return RC::INVALID_ARGUMENT;
-    }
-    auto left_vec   = left.get_vector();
-    auto right_vec  = result.get_vector();
-    auto result_vec = result.get_vector();
+  int   len;
+  Value l, r;
+  Value::cast_to(left, AttrType::VECTORS, l);
+  Value::cast_to(right, AttrType::VECTORS, r);
 
-    for (int i = 0; i < len; i++) {
-      result_vec[i] = round(left_vec[i] * right_vec[i]);
-    }
-
-    return RC::SUCCESS;
-  }
-
-  if ((len = left.length_) != right.length_) {
+  if ((len = l.length_) != r.length_) {
     return RC::INVALID_ARGUMENT;
   }
-  auto   left_vec   = left.get_vector();
-  auto   right_vec  = right.get_vector();
+  auto   left_vec   = l.get_vector();
+  auto   right_vec  = r.get_vector();
   float *result_vec = new float[len];
   for (int i = 0; i < len; i++) {
     result_vec[i] = round(left_vec[i] * right_vec[i]);
@@ -139,10 +106,20 @@ RC VectorType::to_string(const Value &val, string &result) const
     // NOTE: THIS WILL IGNORE THE TRAILING ZEROS
     ss << vec[i];
     if (i != val.length_ - 1) {
-      ss << ", ";
+      ss << ",";
     }
   }
   ss << "]";
   result = ss.str();
+  return RC::SUCCESS;
+}
+RC VectorType::cast_to(const Value &val, AttrType type, Value &result) const
+{
+  switch (type) {
+    case AttrType::VECTORS: {
+      result.ref_vector(val);
+    } break;
+    default: return RC::UNIMPLEMENTED;
+  }
   return RC::SUCCESS;
 }

@@ -348,31 +348,6 @@ AttrType ArithmeticExpr::value_type() const
   return left_type;
 }
 
-AttrType ArithmeticExpr::value_type(bool &is_left) const
-{
-  if (!right_) {
-    return left_->value_type();
-  }
-
-  if (arithmetic_type_ == Type::DIV) {
-    return AttrType::FLOATS;
-  }
-
-  auto left_type  = left_->value_type();
-  auto right_type = right_->value_type();
-
-  int left_priority  = DataType::type_instance(left_type)->cast_cost(right_type);
-  int right_priority = DataType::type_instance(right_type)->cast_cost(left_type);
-
-  LOG_INFO("left_priority:%d %d, right_priority:%d %d", left_priority,left_type, right_priority,right_type);
-  if (left_priority <= right_priority) {
-    LOG_INFO("left_priority <= right_priority%d",right_type );
-    return right_type;
-  }
-  is_left = true;
-  return left_type;
-}
-
 RC ArithmeticExpr::calc_v(const Value &left_value, const Value &right_value, Value &value) const
 {
   RC rc = RC::SUCCESS;
@@ -414,14 +389,9 @@ RC ArithmeticExpr::calc_value(const Value &left_value, const Value &right_value,
     return Value::negative(left_value, value);
   }
 
-  bool is_left = false;
+  value.set_type(value_type());
 
-  value.set_type(value_type(is_left));
-
-  if (is_left) {
-    return calc_v(left_value, right_value, value);
-  }
-  return calc_v(right_value, left_value, value);
+  return calc_v(left_value, right_value, value);
 }
 
 template <bool LEFT_CONSTANT, bool RIGHT_CONSTANT>

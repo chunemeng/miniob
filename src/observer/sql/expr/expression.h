@@ -389,7 +389,6 @@ public:
   ExprType type() const override { return ExprType::ARITHMETIC; }
 
   AttrType value_type() const override;
-  AttrType value_type(bool &is_left) const;
 
   int value_length() const override
   {
