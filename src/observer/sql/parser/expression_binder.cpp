@@ -124,10 +124,12 @@ RC ExpressionBinder::bind_star_expression(
     }
     wildcard_fields(table, bound_expressions, should_alis);
   } else {
-    auto &all_tables = context_.table_map();
+    auto &all_tables = context_.table_ordered();
     // don't change it to auto, because it may lose const & in std::string!!!
-    for (const std::pair<const std::string &, Table *> pair : all_tables) {
-      wildcard_fields(pair.second, bound_expressions, should_alis);
+
+
+    for (auto table : all_tables) {
+      wildcard_fields(table, bound_expressions, should_alis);
     }
   }
 

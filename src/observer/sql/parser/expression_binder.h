@@ -24,18 +24,29 @@ public:
   BinderContext()          = default;
   virtual ~BinderContext() = default;
 
-  void add_table(const char *name, Table *table) { table_map_.emplace(name, table); }
+  void add_table(const char *name, Table *table)
+  {
+    table_map_.emplace(name, table);
+    table_ordered_.emplace_back(table);
+  }
 
-  void add_table(const std::string &name, Table *table) { table_map_.emplace(name, table); }
+  void add_table(const std::string &name, Table *table)
+  {
+    table_map_.emplace(name, table);
+    table_ordered_.emplace_back(table);
+  }
 
   Table *find_table(const char *table_name) const;
 
   Table *find_table(const std::string &table_name) const;
 
   std::unordered_map<std::string, Table *> &table_map() { return table_map_; }
+  std::vector<Table *>                     &table_ordered() { return table_ordered_; }
 
 private:
   std::unordered_map<std::string, Table *> table_map_;
+  // use for output the table in order
+  std::vector<Table *> table_ordered_;
 };
 
 /**
@@ -52,10 +63,10 @@ public:
       bool should_alis = false);
 
 private:
-  RC bind_star_expression(
-      std::unique_ptr<Expression> &star_expr, std::vector<std::unique_ptr<Expression>> &bound_expressions, bool should_alis = false);
-  RC bind_unbound_field_expression(
-      std::unique_ptr<Expression> &unbound_field_expr, std::vector<std::unique_ptr<Expression>> &bound_expressions, bool should_alis = false);
+  RC bind_star_expression(std::unique_ptr<Expression> &star_expr,
+      std::vector<std::unique_ptr<Expression>> &bound_expressions, bool should_alis = false);
+  RC bind_unbound_field_expression(std::unique_ptr<Expression> &unbound_field_expr,
+      std::vector<std::unique_ptr<Expression>> &bound_expressions, bool should_alis = false);
   RC bind_field_expression(
       std::unique_ptr<Expression> &field_expr, std::vector<std::unique_ptr<Expression>> &bound_expressions);
   RC bind_value_expression(

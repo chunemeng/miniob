@@ -16,7 +16,10 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/optimizer/rewrite_rule.h"
 #include <vector>
+#include <map>
 #include <unordered_map>
+
+class JoinLogicalOperator;
 
 /**
  * @brief 将一些谓词表达式下推到表数据扫描中
@@ -32,9 +35,11 @@ public:
   RC rewrite(std::unique_ptr<LogicalOperator> &oper, bool &change_made) override;
 
 private:
+  using PUSH_JOIN_EXPRS_TYPE = std::map<std::pair<std::string, std::string>, std::unique_ptr<Expression>>;
   RC get_exprs_can_pushdown(
       std::unique_ptr<Expression> &expr, std::vector<std::unique_ptr<Expression>> &pushdown_exprs);
-  RC get_exprs_can_pushdown(
-      std::unique_ptr<Expression> &expr, std::unordered_multimap<std::string, std::unique_ptr<Expression>> &pushdown_exprs);
+  RC   get_exprs_can_pushdown(std::unique_ptr<Expression>            &expr,
+        std::unordered_map<std::string, std::unique_ptr<Expression>> &pushdown_exprs,
+        PUSH_JOIN_EXPRS_TYPE                                         &pushdown_join_exprs);
   bool is_empty_predicate(std::unique_ptr<Expression> &expr);
 };

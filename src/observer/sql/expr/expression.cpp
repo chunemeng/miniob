@@ -133,7 +133,7 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
         return RC::INVALID_ARGUMENT;
       }
       bool is_null = left.attr_type() == AttrType::NULLS;
-      result       = (comp_ == IS_C) ? is_null : !is_null;
+      result       = (comp_ == IS_C) == is_null;
     } else {
       result = false;
     }
