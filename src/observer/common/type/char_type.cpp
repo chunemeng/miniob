@@ -78,6 +78,7 @@ int CharType::cast_cost(AttrType type)
   switch (type) {
     case AttrType::CHARS: return 0;
     case AttrType::INTS:
+    case AttrType::FLOATS:
     case AttrType::DATES: return 1;
     default: return INT32_MAX;
   }
