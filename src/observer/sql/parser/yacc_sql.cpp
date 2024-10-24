@@ -2004,7 +2004,7 @@ yyreduce:
       (yyval.attr_info) = new AttrInfoSqlNode;
       (yyval.attr_info)->type = (AttrType)(yyvsp[-4].number);
       (yyval.attr_info)->name = (yyvsp[-5].string);
-      (yyval.attr_info)->length = (yyvsp[-2].number);
+      (yyval.attr_info)->length = ((yyvsp[-2].number)) * sizeof(float);
       (yyval.attr_info)->nullable = (yyvsp[0].number);
       free((yyvsp[-5].string));
     }

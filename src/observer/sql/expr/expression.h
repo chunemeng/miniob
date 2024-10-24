@@ -389,7 +389,9 @@ public:
   ExprType type() const override { return ExprType::ARITHMETIC; }
 
   AttrType value_type() const override;
-  int      value_length() const override
+  AttrType value_type(bool &is_left) const;
+
+  int value_length() const override
   {
     if (!right_) {
       return left_->value_length();
@@ -410,6 +412,7 @@ public:
 
 private:
   RC calc_value(const Value &left_value, const Value &right_value, Value &value) const;
+  RC calc_v(const Value &left_value, const Value &right_value, Value &value) const;
 
   RC calc_column(const Column &left_column, const Column &right_column, Column &column) const;
 

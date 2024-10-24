@@ -37,6 +37,9 @@ Value::Value(const Value &other)
     case AttrType::CHARS: {
       set_string_from_other(other);
     } break;
+    case AttrType::VECTORS: {
+      set_vec_from_other(other);
+    } break;
 
     default: {
       this->value_ = other.value_;
@@ -66,6 +69,9 @@ Value &Value::operator=(const Value &other)
   switch (this->attr_type_) {
     case AttrType::CHARS: {
       set_string_from_other(other);
+    } break;
+    case AttrType::VECTORS: {
+      set_vec_from_other(other);
     } break;
 
     default: {
@@ -99,6 +105,12 @@ void Value::reset()
         value_.pointer_value_ = nullptr;
       }
       break;
+    case AttrType::VECTORS:
+      if (own_data_ && value_.vector_value_ != nullptr) {
+        delete[] value_.vector_value_;
+        value_.vector_value_ = nullptr;
+      }
+      break;
     default: break;
   }
 
@@ -129,6 +141,12 @@ void Value::set_data(char *data, int length)
       value_.int_value_ = *(int *)data;
       length_           = length;
     } break;
+    case AttrType::VECTORS: {
+      own_data_            = true;
+      length_              = length / sizeof(float);
+      value_.vector_value_ = new float[length_];
+      memcpy(value_.vector_value_, data, length_ * sizeof(float));
+    } break;
     default: {
       LOG_WARN("unknown data type: %d", attr_type_);
     } break;
@@ -141,6 +159,25 @@ void Value::set_int(int val)
   attr_type_        = AttrType::INTS;
   value_.int_value_ = val;
   length_           = sizeof(val);
+}
+
+void Value::set_vector(float *vec, int len)
+{
+  reset();
+  attr_type_           = AttrType::VECTORS;
+  own_data_            = true;
+  length_              = len;
+  value_.vector_value_ = vec;
+}
+
+void Value::set_vector(std::vector<float> &vec)
+{
+  reset();
+  attr_type_           = AttrType::VECTORS;
+  own_data_            = true;
+  length_              = vec.size();
+  value_.vector_value_ = new float[length_];
+  memcpy(value_.vector_value_, vec.data(), length_ * sizeof(float));
 }
 
 void Value::set_date(int y, int m, int d)
@@ -216,6 +253,9 @@ void Value::set_value(const Value &value)
     case AttrType::DATES: {
       set_date(value.get_int() / 10000, (value.get_int() % 10000) / 100, value.get_int() % 100);
     } break;
+    case AttrType::VECTORS: {
+      set_vec_from_other(value);
+    } break;
 
     default: {
       ASSERT(false, "got an invalid value type");
@@ -238,6 +278,9 @@ const char *Value::data() const
   switch (attr_type_) {
     case AttrType::CHARS: {
       return value_.pointer_value_;
+    } break;
+    case AttrType::VECTORS: {
+      return reinterpret_cast<const char *>(value_.vector_value_);
     } break;
     default: {
       return (const char *)&value_;
@@ -364,3 +407,12 @@ bool Value::get_boolean() const
   }
   return false;
 }
+void Value::set_vec_from_other(const Value &other)
+{
+  ASSERT(attr_type_ == AttrType::VECTORS, "attr type is not VECTORS");
+  if (own_data_ && other.value_.vector_value_ != nullptr && length_ != 0) {
+    this->value_.vector_value_ = new float[this->length_];
+    memcpy(this->value_.vector_value_, other.value_.vector_value_, this->length_);
+  }
+}
+float *Value::get_vector() const { return value_.vector_value_; }

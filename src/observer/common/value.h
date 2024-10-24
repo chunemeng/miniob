@@ -92,12 +92,20 @@ public:
     return DataType::type_instance(value.attr_type())->cast_to(value, to_type, result);
   }
 
-  void set_type(AttrType type) { this->attr_type_ = type; }
-  void set_data(char *data, int length);
-  void set_data(const char *data, int length) { this->set_data(const_cast<char *>(data), length); }
-  void set_value(const Value &value);
-  void set_boolean(bool val);
-  void set_null(int len = 0);
+  static int cast_cost(AttrType from_type, AttrType to_type)
+  {
+    return DataType::type_instance(from_type)->cast_cost(to_type);
+  }
+
+  void     set_type(AttrType type) { this->attr_type_ = type; }
+  void     set_data(char *data, int length);
+  void     set_data(const char *data, int length) { this->set_data(const_cast<char *>(data), length); }
+  void     set_value(const Value &value);
+  void     set_boolean(bool val);
+  void     set_null(int len = 0);
+  void     set_vector(float *vec, int len);
+  void     set_vector(std::vector<float> &vec);
+  AttrType get_result_type(const Value &left, const Value &right) const;
 
   string to_string() const;
 
@@ -119,8 +127,10 @@ public:
   float  get_float() const;
   string get_string() const;
   bool   get_boolean() const;
+  float *get_vector() const;
 
 private:
+  void set_vec_from_other(const Value &other);
   void set_int(int val);
   void set_date(int y, int m, int d);
   void set_float(float val);
@@ -137,6 +147,8 @@ private:
     float   float_value_;
     bool    bool_value_;
     char   *pointer_value_;
+    // NOTE: STRICT ALIASING WARNING(?)
+    float *vector_value_;
   } value_ = {.int_value_ = 0};
 
   /// 是否申请并占有内存, 目前对于 CHARS 类型 own_data_ 为true, 其余类型 own_data_ 为false

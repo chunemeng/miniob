@@ -91,8 +91,7 @@ RC CastExpr::cast(const Value &value, Value &cast_value) const
 RC CastExpr::get_value(const Tuple &tuple, Value &result) const
 {
   Value value;
-  RC rc = child_->get_value(tuple, value);
-  LOG_INFO("cast value %d %d", child_->type(), child_->value_type());
+  RC    rc = child_->get_value(tuple, value);
 
   if (rc != RC::SUCCESS) {
     return rc;
@@ -333,26 +332,48 @@ AttrType ArithmeticExpr::value_type() const
     return left_->value_type();
   }
 
-  if (left_->value_type() == AttrType::INTS && right_->value_type() == AttrType::INTS &&
-      arithmetic_type_ != Type::DIV) {
-    return AttrType::INTS;
+  if (arithmetic_type_ == Type::DIV) {
+    return AttrType::FLOATS;
   }
 
-  return AttrType::FLOATS;
+  auto left_type  = left_->value_type();
+  auto right_type = right_->value_type();
+
+  int left_priority  = DataType::type_instance(left_type)->cast_cost(right_type);
+  int right_priority = DataType::type_instance(right_type)->cast_cost(left_type);
+
+  if (left_priority <= right_priority) {
+    return left_type;
+  }
+  return right_type;
 }
 
-RC ArithmeticExpr::calc_value(const Value &left_value, const Value &right_value, Value &value) const
+AttrType ArithmeticExpr::value_type(bool &is_left) const
 {
-  RC rc = RC::SUCCESS;
-
-  if (left_value.attr_type() == AttrType::NULLS || right_value.attr_type() == AttrType::NULLS) {
-    value.set_null();
-    return rc;
+  if (!right_) {
+    return left_->value_type();
   }
 
-  const AttrType target_type = value_type();
-  value.set_type(target_type);
+  if (arithmetic_type_ == Type::DIV) {
+    return AttrType::FLOATS;
+  }
 
+  auto left_type  = left_->value_type();
+  auto right_type = right_->value_type();
+
+  int left_priority  = DataType::type_instance(left_type)->cast_cost(right_type);
+  int right_priority = DataType::type_instance(right_type)->cast_cost(left_type);
+
+  if (left_priority <= right_priority) {
+    return left_type;
+  }
+  is_left = false;
+  return right_type;
+}
+
+RC ArithmeticExpr::calc_v(const Value &left_value, const Value &right_value, Value &value) const
+{
+  RC rc = RC::SUCCESS;
   switch (arithmetic_type_) {
     case Type::ADD: {
       Value::add(left_value, right_value, value);
@@ -380,6 +401,29 @@ RC ArithmeticExpr::calc_value(const Value &left_value, const Value &right_value,
     } break;
   }
   return rc;
+}
+
+RC ArithmeticExpr::calc_value(const Value &left_value, const Value &right_value, Value &value) const
+{
+  RC rc = RC::SUCCESS;
+
+  if (left_value.attr_type() == AttrType::NULLS || right_value.attr_type() == AttrType::NULLS) {
+    value.set_null();
+    return rc;
+  }
+
+  if (arithmetic_type_ == Type::NEGATIVE) {
+    return Value::negative(left_value, value);
+  }
+
+  bool is_left = true;
+
+  value.set_type(value_type(is_left));
+
+  if (is_left) {
+    return calc_v(left_value, right_value, value);
+  }
+  return calc_v(right_value, left_value, value);
 }
 
 template <bool LEFT_CONSTANT, bool RIGHT_CONSTANT>

@@ -386,6 +386,7 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
     } else {
       if (field->type() != value.attr_type()) {
         Value real_value;
+        LOG_INFO("field type: %d, value type: %d", field->type(), value.attr_type());
         rc = Value::cast_to(value, field->type(), real_value);
         if (OB_FAIL(rc)) {
           LOG_WARN("failed to cast value. table name:%s,field name:%s,value:%s ",
@@ -417,6 +418,9 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
     if (copy_len > data_len) {
       copy_len = data_len + 1;
     }
+  }
+  if (field->type() == AttrType::VECTORS) {
+    copy_len = data_len * sizeof(float);
   }
   memcpy(record_data + field->offset(), value.data(), copy_len);
   return RC::SUCCESS;

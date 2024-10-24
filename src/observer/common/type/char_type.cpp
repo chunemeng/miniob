@@ -27,35 +27,52 @@ RC CharType::set_value_from_str(Value &val, const string &data) const
   return RC::SUCCESS;
 }
 
+RC parser_str_to_float(const char *input, int len, std::vector<float> &array)
+{
+  std::string_view content(input + 1, len - 2);
+
+  std::string buffer;
+  size_t      start = 0;
+  size_t      end;
+  while ((end = content.find(',', start)) != std::string_view::npos) {
+    char *endptr;
+    auto  item  = content.substr(start, end - start);
+    float value = strtof(item.data(), &endptr);
+    if (endptr == item.data()) {
+      // Conversion failed
+      return RC::INVALID_ARGUMENT;
+    }
+    array.emplace_back(value);
+
+    start = end + 1;
+  }
+
+  if (start < content.size()) {
+    char *endptr;
+    auto  item  = content.substr(start, end - start);
+    float value = strtof(item.data(), &endptr);
+    if (endptr == item.data()) {
+      // Conversion failed
+      return RC::INVALID_ARGUMENT;
+    }
+    array.push_back(value);
+  }
+  return RC::SUCCESS;
+}
+
 RC CharType::cast_to(const Value &val, AttrType type, Value &result) const
 {
   switch (type) {
     case AttrType::FLOATS: {
-      char  *end;
-      auto   str        = val.value_.pointer_value_;
-      double val_d      = strtod(str, &end);
       result.attr_type_ = AttrType::FLOATS;
 
-      if (end != str) {
-        result.value_.float_value_ = static_cast<float >(val_d);
-      } else {
-        result.value_.float_value_ = 0;
-      }
+      result.set_float(val.get_float());
     } break;
     case AttrType::INTS: {
-      char  *end;
-      auto   str        = val.value_.pointer_value_;
-      double val_d      = strtod(str, &end);
       result.attr_type_ = AttrType::INTS;
 
-      if (end != str) {
-        result.value_.int_value_ = static_cast<int>(lround(val_d));
-      } else {
-        result.value_.int_value_ = 0;
-      }
-    }
-
-    break;
+      result.set_int(val.get_int());
+    } break;
     case AttrType::DATES:
       int y, m, d;
       if (sscanf(val.value_.pointer_value_, "%d-%d-%d", &y, &m, &d) != 3) {
@@ -68,6 +85,16 @@ RC CharType::cast_to(const Value &val, AttrType type, Value &result) const
       }
       result.set_date(y, m, d);
       break;
+    case AttrType::VECTORS: {
+      result.attr_type_ = AttrType::VECTORS;
+      std::vector<float> vec;
+      RC                 rc = parser_str_to_float(val.value_.pointer_value_, val.length_, vec);
+      if (rc != RC::SUCCESS) {
+        return rc;
+      }
+      result.set_vector(vec);
+      break;
+    }
     default: return RC::UNIMPLEMENTED;
   }
   return RC::SUCCESS;
@@ -80,6 +107,7 @@ int CharType::cast_cost(AttrType type)
     case AttrType::INTS:
     case AttrType::FLOATS:
     case AttrType::DATES: return 1;
+    case AttrType::VECTORS: return 2;
     default: return INT32_MAX;
   }
 }
@@ -89,5 +117,69 @@ RC CharType::to_string(const Value &val, string &result) const
   stringstream ss;
   ss << val.value_.pointer_value_;
   result = ss.str();
+  return RC::SUCCESS;
+}
+RC CharType::add(const Value &left, const Value &right, Value &result) const
+{
+  switch (right.attr_type_) {
+    case AttrType::INTS: {
+      result.set_int(left.get_int() + right.get_int());
+    } break;
+
+    case AttrType::FLOATS: {
+      result.set_float(left.get_float() + right.get_float());
+    } break;
+    case AttrType::VECTORS: {
+      return Value::add(right, left, result);
+    }
+    default: return RC::INVALID_ARGUMENT;
+  }
+  return RC::SUCCESS;
+}
+
+RC CharType::subtract(const Value &left, const Value &right, Value &result) const
+{
+  switch (right.attr_type_) {
+    case AttrType::INTS: {
+      result.set_int(left.get_int() - right.get_int());
+    } break;
+
+    case AttrType::FLOATS: {
+      result.set_float(left.get_float() - right.get_float());
+    } break;
+    case AttrType::VECTORS: {
+      return Value::subtract(right, left, result);
+    }
+    default: return RC::INVALID_ARGUMENT;
+  }
+  return RC::SUCCESS;
+}
+RC CharType::multiply(const Value &left, const Value &right, Value &result) const
+{
+  switch (right.attr_type_) {
+    case AttrType::INTS: {
+      result.set_int(left.get_int() * right.get_int());
+    } break;
+
+    case AttrType::FLOATS: {
+      result.set_float(left.get_float() * right.get_float());
+    } break;
+    case AttrType::VECTORS: {
+      return Value::multiply(right, left, result);
+    }
+    default: return RC::INVALID_ARGUMENT;
+  }
+  return RC::SUCCESS;
+}
+RC CharType::divide(const Value &left, const Value &right, Value &result) const
+{
+  switch (right.attr_type_) {
+    case AttrType::FLOATS: {
+      Value temp;
+      temp.set_float(left.get_float());
+      return Value::divide(temp, right, result);
+    } break;
+    default: return RC::INVALID_ARGUMENT;
+  }
   return RC::SUCCESS;
 }

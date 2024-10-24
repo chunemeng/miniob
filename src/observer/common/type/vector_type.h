@@ -20,16 +20,13 @@ class VectorType : public DataType
 {
 public:
   VectorType() : DataType(AttrType::VECTORS) {}
-  virtual ~VectorType() {}
+  ~VectorType() override = default;
 
-  int compare(const Value &left, const Value &right) const override { return INT32_MAX; }
+  int compare(const Value &left, const Value &right) const override;
 
-  RC add(const Value &left, const Value &right, Value &result) const override { return RC::UNIMPLEMENTED; }
-  RC subtract(const Value &left, const Value &right, Value &result) const override { return RC::UNIMPLEMENTED; }
-  RC multiply(const Value &left, const Value &right, Value &result) const override { return RC::UNIMPLEMENTED; }
+  RC add(const Value &left, const Value &right, Value &result) const override;
+  RC subtract(const Value &left, const Value &right, Value &result) const override;
+  RC multiply(const Value &left, const Value &right, Value &result) const override;
 
-  RC to_string(const Value &val, string &result) const override { return RC::UNIMPLEMENTED; }
-
-private:
-  std::vector<int> value_;
+  RC to_string(const Value &val, string &result) const override;
 };
