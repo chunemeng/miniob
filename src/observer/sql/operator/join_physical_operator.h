@@ -26,6 +26,9 @@ class NestedLoopJoinPhysicalOperator : public PhysicalOperator
 {
 public:
   NestedLoopJoinPhysicalOperator();
+  explicit NestedLoopJoinPhysicalOperator(std::vector<std::unique_ptr<Expression>>& condition) : join_condition_(std::move(condition))
+  {}
+
   virtual ~NestedLoopJoinPhysicalOperator() = default;
 
   PhysicalOperatorType type() const override { return PhysicalOperatorType::NESTED_LOOP_JOIN; }
@@ -38,16 +41,19 @@ public:
 private:
   RC left_next();   //! 左表遍历下一条数据
   RC right_next();  //! 右表遍历下一条数据，如果上一轮结束了就重新开始新的一轮
+  RC filter(bool &result);
 
 private:
   Trx *trx_ = nullptr;
 
   //! 左表右表的真实对象是在PhysicalOperator::children_中，这里是为了写的时候更简单
-  PhysicalOperator *left_        = nullptr;
-  PhysicalOperator *right_       = nullptr;
-  Tuple            *left_tuple_  = nullptr;
-  Tuple            *right_tuple_ = nullptr;
-  JoinedTuple       joined_tuple_;         //! 当前关联的左右两个tuple
-  bool              round_done_   = true;  //! 右表遍历的一轮是否结束
-  bool              right_closed_ = true;  //! 右表算子是否已经关闭
+  PhysicalOperator           *left_           = nullptr;
+  PhysicalOperator           *right_          = nullptr;
+  Tuple                      *left_tuple_     = nullptr;
+  Tuple                      *right_tuple_    = nullptr;
+  std::vector<std::unique_ptr<Expression>> join_condition_;
+
+  JoinedTuple joined_tuple_;         //! 当前关联的左右两个tuple
+  bool        round_done_   = true;  //! 右表遍历的一轮是否结束
+  bool        right_closed_ = true;  //! 右表算子是否已经关闭
 };

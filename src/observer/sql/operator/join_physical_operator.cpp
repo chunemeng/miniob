@@ -22,6 +22,7 @@ RC NestedLoopJoinPhysicalOperator::open(Trx *trx)
     LOG_WARN("nlj operator should have 2 children");
     return RC::INTERNAL;
   }
+  // NOTE: JOIN MUSH HAVE A TABLE SCAN OPERATOR AS LEFT CHILD
 
   RC rc         = RC::SUCCESS;
   left_         = children_[0].get();
@@ -36,32 +37,33 @@ RC NestedLoopJoinPhysicalOperator::open(Trx *trx)
 
 RC NestedLoopJoinPhysicalOperator::next()
 {
-  bool left_need_step = (left_tuple_ == nullptr);
   RC   rc             = RC::SUCCESS;
-  if (round_done_) {
-    left_need_step = true;
-  } else {
-    rc = right_next();
-    if (rc != RC::SUCCESS) {
-      if (rc == RC::RECORD_EOF) {
-        left_need_step = true;
-      } else {
+  do {
+    if (round_done_) {
+      rc = left_next();
+      if (rc != RC::SUCCESS) {
         return rc;
       }
-    } else {
-      return rc;  // got one tuple from right
     }
-  }
+    rc = right_next();
 
-  if (left_need_step) {
-    rc = left_next();
+    if (rc != RC::SUCCESS) {
+      if (rc == RC::RECORD_EOF) {
+        round_done_ = true;
+        continue;
+      }
+      return rc;
+    }
+    bool result = false;
+    rc          = filter(result);
     if (rc != RC::SUCCESS) {
       return rc;
     }
-  }
+    if (result) {
+      return rc;
+    }
 
-  rc = right_next();
-  return rc;
+  } while (true);
 }
 
 RC NestedLoopJoinPhysicalOperator::close()
@@ -120,14 +122,32 @@ RC NestedLoopJoinPhysicalOperator::right_next()
   }
 
   rc = right_->next();
+
   if (rc != RC::SUCCESS) {
-    if (rc == RC::RECORD_EOF) {
-      round_done_ = true;
-    }
     return rc;
   }
 
   right_tuple_ = right_->current_tuple();
   joined_tuple_.set_right(right_tuple_);
+  return rc;
+}
+RC NestedLoopJoinPhysicalOperator::filter(bool &result)
+{
+  RC    rc = RC::SUCCESS;
+  Value value;
+  for (unique_ptr<Expression> &expr : join_condition_) {
+    rc = expr->get_value(joined_tuple_, value);
+    if (rc != RC::SUCCESS) {
+      return rc;
+    }
+
+    bool tmp_result = value.get_boolean();
+    if (!tmp_result) {
+      result = false;
+      return rc;
+    }
+  }
+
+  result = true;
   return rc;
 }

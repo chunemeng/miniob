@@ -100,9 +100,8 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   unique_ptr<LogicalOperator> *last_oper = &table_oper;
 
   const auto &tables = select_stmt->tables();
-  for (const std::pair<const std::string &, Table *> pair : tables) {
-
-    unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(pair.second, ReadWriteMode::READ_ONLY));
+  for (auto table : tables) {
+    unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, ReadWriteMode::READ_ONLY));
     if (table_oper == nullptr) {
       table_oper = std::move(table_get_oper);
     } else {

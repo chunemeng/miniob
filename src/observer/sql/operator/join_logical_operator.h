@@ -27,7 +27,5 @@ public:
   JoinLogicalOperator()          = default;
   virtual ~JoinLogicalOperator() = default;
 
-  LogicalOperatorType type() const override { return LogicalOperatorType::JOIN; }
-
-private:
+  LogicalOperatorType                       type() const override { return LogicalOperatorType::JOIN; }
 };

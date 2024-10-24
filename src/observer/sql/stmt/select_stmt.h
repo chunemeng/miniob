@@ -42,7 +42,7 @@ public:
   static RC create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt);
 
 public:
-  const std::unordered_map<std::string, Table *> &tables() const { return tables_; }
+  const std::vector<Table *> &tables() const { return tables_; }
   FilterStmt                 *filter_stmt() const { return filter_stmt_; }
 
   std::vector<std::unique_ptr<Expression>> &query_expressions() { return query_expressions_; }
@@ -50,7 +50,7 @@ public:
 
 private:
   std::vector<std::unique_ptr<Expression>> query_expressions_;
-  std::unordered_map<std::string, Table *> tables_;
+  std::vector<Table *>                     tables_;
   FilterStmt                              *filter_stmt_ = nullptr;
   std::vector<std::unique_ptr<Expression>> group_by_;
 };

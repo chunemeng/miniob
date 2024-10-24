@@ -18,23 +18,40 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/logical_operator.h"
 #include "sql/operator/table_get_logical_operator.h"
 #include "sql/operator/join_logical_operator.h"
+#include <queue>
 
-RC push_predicate_to_child(
-    std::unordered_multimap<std::string, std::unique_ptr<Expression>> &pushdown_exprs, JoinLogicalOperator *join_oper)
+RC push_predicate_to_child(std::unordered_map<std::string, std::unique_ptr<Expression>> &pushdown_exprs,
+    std::map<std::pair<std::string, std::string>, std::unique_ptr<Expression>>          &pushdown_join_exprs,
+    JoinLogicalOperator                                                                 *join_oper)
 {
-  // TODO:理论上expr要推到最底层的，但是这里只推到第一次出现的地方
-  // 以及只考虑了expr第一个field的名字，没有考虑多个field的情况
-  LOG_INFO("push predicate to child");
+  // 对JOIN算子，进行层状遍历，将谓词下推到最底层的TableGet算子，同时将JOIN算子的谓词下推到JOIN算子
   if (join_oper->children().size() != 2) {
     return RC::INVALID_ARGUMENT;
   }
 
-  RC rc = RC::SUCCESS;
+  RC                            rc = RC::SUCCESS;
+  std::queue<LogicalOperator *> q;
+  JoinLogicalOperator          *current = join_oper;
+  JoinLogicalOperator *child_join = nullptr;
 
-  auto tmp_func = [&](LogicalOperator *oper) {
-    if (oper->type() == LogicalOperatorType::TABLE_GET) {
-      auto  ch1       = dynamic_cast<TableGetLogicalOperator *>(oper);
-      auto  name      = ch1->table()->name();
+  int pos = -1;
+  q.emplace(current->children()[0].get());
+  q.emplace(current->children()[1].get());
+  LogicalOperator *child = nullptr;
+
+  while (!q.empty()) {
+    child = q.front();
+    q.pop();
+    pos = (pos + 1) & 1;
+
+    if (child->type() == LogicalOperatorType::JOIN) {
+      child_join = dynamic_cast<JoinLogicalOperator *>(child);
+      q.emplace(child_join->children()[0].get());
+      q.emplace(child_join->children()[1].get());
+    } else if (child->type() == LogicalOperatorType::TABLE_GET) {
+      auto ch1  = dynamic_cast<TableGetLogicalOperator *>(child);
+      auto name = ch1->table()->name();
+      LOG_INFO("push predicate to table get operator %s", name.c_str());
       auto  iter      = pushdown_exprs.find(name);
       auto &predicate = ch1->predicates();
       while (iter != pushdown_exprs.end()) {
@@ -42,24 +59,43 @@ RC push_predicate_to_child(
         pushdown_exprs.erase(iter);
         iter = pushdown_exprs.find(name);
       }
-    } else {
-      auto ch1 = dynamic_cast<JoinLogicalOperator *>(join_oper->children()[0].get());
-      rc       = push_predicate_to_child(pushdown_exprs, ch1);
+      if (current->type() != LogicalOperatorType::JOIN) {
+        rc = RC::INVALID_ARGUMENT;
+        return rc;
+      }
+      if (pushdown_join_exprs.empty()) {
+        continue;
+      }
+      LOG_INFO("current %p", current);
+      auto &pushdown_join_predicate = current->expressions();
+      auto  lower_bound             = pushdown_join_exprs.lower_bound({name, ""});
+      auto  it                      = lower_bound;
+      for (; it != pushdown_join_exprs.end() && it->first.first == name; ++it) {
+        LOG_INFO("push  %s", it->first.first.c_str());
+        pushdown_join_predicate.emplace_back(std::move(it->second));
+      }
+
+      for (auto it2 = pushdown_join_exprs.begin(); it2 != lower_bound;) {
+        auto iterrr = it2;
+        ++it2;
+        if (iterrr->first.second == name) {
+          LOG_INFO("push  %s", iterrr->first.second.c_str());
+
+          pushdown_join_predicate.emplace_back(std::move(iterrr->second));
+          pushdown_join_exprs.erase(iterrr);
+        }
+      }
+
+      pushdown_join_exprs.erase(lower_bound, it);
+      LOG_INFO("push predicate to join operator %d", pushdown_join_exprs.size());
     }
-    return rc;
-  };
-  rc = tmp_func(join_oper->children()[0].get());
-  if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to push predicate to child. rc=%s", strrc(rc));
-    return rc;
+
+    LOG_INFO("pos %d", pos);
+    if (pos) {
+      current = child_join;
+    }
   }
 
-  rc = tmp_func(join_oper->children()[1].get());
-
-  if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to push predicate to child. rc=%s", strrc(rc));
-    return rc;
-  }
   return rc;
 }
 
@@ -82,9 +118,12 @@ RC PredicatePushdownRewriter::rewrite(std::unique_ptr<LogicalOperator> &oper, bo
       return rc;
     }
 
-    std::unique_ptr<Expression>                                      &predicate_expr = predicate_oper_exprs.front();
-    std::unordered_multimap<std::string, std::unique_ptr<Expression>> pushdown_exprs;
-    rc = get_exprs_can_pushdown(predicate_expr, pushdown_exprs);
+    std::unique_ptr<Expression> &predicate_expr = predicate_oper_exprs.front();
+
+    PUSH_JOIN_EXPRS_TYPE                                         pushdown_join_exprs;
+    std::unordered_map<std::string, std::unique_ptr<Expression>> pushdown_exprs;
+
+    rc = get_exprs_can_pushdown(predicate_expr, pushdown_exprs, pushdown_join_exprs);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to get exprs can pushdown. rc=%s", strrc(rc));
       return rc;
@@ -99,11 +138,11 @@ RC PredicatePushdownRewriter::rewrite(std::unique_ptr<LogicalOperator> &oper, bo
       predicate_expr = std::unique_ptr<Expression>(new ValueExpr(value));
     }
 
-    if (!pushdown_exprs.empty()) {
+    if (!pushdown_exprs.empty() || !pushdown_join_exprs.empty()) {
       change_made = true;
       // the child of join operator is table get operator or another join operator
-      push_predicate_to_child(pushdown_exprs, table_get_oper);
-      ASSERT(pushdown_exprs.empty(), "pushdown_exprs should be empty");
+      push_predicate_to_child(pushdown_exprs, pushdown_join_exprs, table_get_oper);
+      ASSERT(pushdown_exprs.empty() && pushdown_join_exprs.empty(), "pushdown_exprs should be empty");
     }
     return rc;
   }
@@ -216,9 +255,12 @@ RC PredicatePushdownRewriter::get_exprs_can_pushdown(
   }
   return rc;
 }
-RC PredicatePushdownRewriter::get_exprs_can_pushdown(
-    unique_ptr<Expression> &expr, std::unordered_multimap<std::string, std::unique_ptr<Expression>> &pushdown_exprs)
+
+RC PredicatePushdownRewriter::get_exprs_can_pushdown(unique_ptr<Expression> &expr,
+    std::unordered_map<std::string, std::unique_ptr<Expression>>            &pushdown_exprs,
+    PUSH_JOIN_EXPRS_TYPE                                                    &pushdown_join_exprs)
 {
+  // NOTE: THIS IS A PIECE OF SHIT
   RC rc = RC::SUCCESS;
   if (expr->type() == ExprType::CONJUNCTION) {
     ConjunctionExpr *conjunction_expr = static_cast<ConjunctionExpr *>(expr.get());
@@ -233,7 +275,7 @@ RC PredicatePushdownRewriter::get_exprs_can_pushdown(
     for (auto iter = child_exprs.begin(); iter != child_exprs.end();) {
       // 对每个子表达式，判断是否可以下放到table get 算子
       // 如果可以的话，就从当前孩子节点中删除他
-      rc = get_exprs_can_pushdown(*iter, pushdown_exprs);
+      rc = get_exprs_can_pushdown(*iter, pushdown_exprs, pushdown_join_exprs);
       if (rc != RC::SUCCESS) {
         LOG_WARN("failed to get pushdown expressions. rc=%s", strrc(rc));
         return rc;
@@ -255,6 +297,13 @@ RC PredicatePushdownRewriter::get_exprs_can_pushdown(
     bool                         is_right_field = right_expr->type() == ExprType::FIELD;
     // 比较操作的左右两边只要有一个是取列字段值的并且另一边也是取字段值或常量，就pushdown
     if (is_left_field && is_right_field) {
+      auto left_name  = dynamic_cast<FieldExpr *>(left_expr.get())->table_name();
+      auto right_name = dynamic_cast<FieldExpr *>(right_expr.get())->table_name();
+      if (left_name > right_name) {
+        pushdown_join_exprs.emplace(std::make_pair(right_name, left_name), std::move(expr));
+      } else {
+        pushdown_join_exprs.emplace(std::make_pair(left_name, right_name), std::move(expr));
+      }
       return rc;
     }
     if (!is_left_field && right_expr->type() != ExprType::FIELD) {
@@ -266,8 +315,7 @@ RC PredicatePushdownRewriter::get_exprs_can_pushdown(
     }
     auto name =
         (is_left_field ? dynamic_cast<FieldExpr *>(left_expr.get()) : dynamic_cast<FieldExpr *>(right_expr.get()))
-            ->field_name();
-
+            ->table_name();
     pushdown_exprs.emplace(name, std::move(expr));
   }
   return rc;
