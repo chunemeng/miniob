@@ -27,8 +27,8 @@ public:
   int cast_cost(AttrType type) override
   {
     switch (type) {
+      case AttrType::FLOATS: return -1;
       case AttrType::INTS: return 0;
-      case AttrType::FLOATS: return 1;
       default: return INT32_MAX;
     }
   }

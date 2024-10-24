@@ -343,9 +343,9 @@ AttrType ArithmeticExpr::value_type() const
   int right_priority = DataType::type_instance(right_type)->cast_cost(left_type);
 
   if (left_priority <= right_priority) {
-    return left_type;
+    return right_type;
   }
-  return right_type;
+  return left_type;
 }
 
 AttrType ArithmeticExpr::value_type(bool &is_left) const
@@ -364,11 +364,13 @@ AttrType ArithmeticExpr::value_type(bool &is_left) const
   int left_priority  = DataType::type_instance(left_type)->cast_cost(right_type);
   int right_priority = DataType::type_instance(right_type)->cast_cost(left_type);
 
+  LOG_INFO("left_priority:%d %d, right_priority:%d %d", left_priority,left_type, right_priority,right_type);
   if (left_priority <= right_priority) {
-    return left_type;
+    LOG_INFO("left_priority <= right_priority%d",right_type );
+    return right_type;
   }
-  is_left = false;
-  return right_type;
+  is_left = true;
+  return left_type;
 }
 
 RC ArithmeticExpr::calc_v(const Value &left_value, const Value &right_value, Value &value) const
@@ -412,7 +414,7 @@ RC ArithmeticExpr::calc_value(const Value &left_value, const Value &right_value,
     return Value::negative(left_value, value);
   }
 
-  bool is_left = true;
+  bool is_left = false;
 
   value.set_type(value_type(is_left));
 
