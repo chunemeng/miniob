@@ -295,6 +295,7 @@ RC PredicatePushdownRewriter::get_exprs_can_pushdown(unique_ptr<Expression> &exp
     std::unique_ptr<Expression> &right_expr     = comparison_expr->right();
     bool                         is_left_field  = left_expr->type() == ExprType::FIELD;
     bool                         is_right_field = right_expr->type() == ExprType::FIELD;
+
     // 比较操作的左右两边只要有一个是取列字段值的并且另一边也是取字段值或常量，就pushdown
     if (is_left_field && is_right_field) {
       auto left_name  = dynamic_cast<FieldExpr *>(left_expr.get())->table_name();
@@ -313,6 +314,13 @@ RC PredicatePushdownRewriter::get_exprs_can_pushdown(unique_ptr<Expression> &exp
         right_expr->type() != ExprType::FIELD && right_expr->type() != ExprType::VALUE) {
       return rc;
     }
+
+    // NOTE: 防止把实际两侧都是FIELD的表达式 推到了TABLE GET算子 而不是JOIN算子
+    if (left_expr->type() == ExprType::CAST || right_expr->type() == ExprType::CAST) {
+      return rc;
+    }
+
+
     auto name =
         (is_left_field ? dynamic_cast<FieldExpr *>(left_expr.get()) : dynamic_cast<FieldExpr *>(right_expr.get()))
             ->table_name();

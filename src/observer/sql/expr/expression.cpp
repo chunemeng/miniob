@@ -91,7 +91,9 @@ RC CastExpr::cast(const Value &value, Value &cast_value) const
 RC CastExpr::get_value(const Tuple &tuple, Value &result) const
 {
   Value value;
-  RC    rc = child_->get_value(tuple, value);
+  RC rc = child_->get_value(tuple, value);
+  LOG_INFO("cast value %d %d", child_->type(), child_->value_type());
+
   if (rc != RC::SUCCESS) {
     return rc;
   }
