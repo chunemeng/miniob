@@ -287,13 +287,14 @@ RC ExpressionBinder::bind_comparison_expression(
   AttrType left_attr_type  = left_expr->value_type();
   AttrType right_attr_type = right_expr->value_type();
 
+  LOG_INFO("left type: %s, right type: %s", attr_type_to_string(left_attr_type), attr_type_to_string(right_attr_type));
+
   if (left_attr_type == AttrType::NULLS || right_attr_type == AttrType::NULLS) {
     bound_expressions.emplace_back(std::move(expr));
     return RC::SUCCESS;
   }
 
   if (left_attr_type != right_attr_type) {
-    LOG_INFO("left type: %s, right type: %s", attr_type_to_string(left_attr_type), attr_type_to_string(right_attr_type));
     auto left_to_right_cost = implicit_cast_cost(left_attr_type, right_attr_type);
     auto right_to_left_cost = implicit_cast_cost(right_attr_type, left_attr_type);
     if (left_to_right_cost <= right_to_left_cost && left_to_right_cost != INT32_MAX) {
