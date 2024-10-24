@@ -386,8 +386,13 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
     } else {
       if (field->type() != value.attr_type()) {
         Value real_value;
-        LOG_INFO("field type: %d, value type: %d", field->type(), value.attr_type());
         rc = Value::cast_to(value, field->type(), real_value);
+        if (real_value.attr_type() == AttrType::VECTORS &&
+            (real_value.length() * sizeof(float)) != static_cast<size_t>(field->len())) {
+          LOG_INFO("field type: %d, value type: %d", field->type(), value.attr_type());
+          return RC::INVALID_ARGUMENT;
+        }
+
         if (OB_FAIL(rc)) {
           LOG_WARN("failed to cast value. table name:%s,field name:%s,value:%s ",
             table_meta_.name(), field->name().c_str(), value.to_string().c_str());
