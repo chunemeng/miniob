@@ -16,7 +16,6 @@ See the Mulan PSL v2 for more details. */
 
 #include <memory>
 #include <string>
-
 #include "common/value.h"
 #include "storage/db/db.h"
 #include "storage/field/field.h"
@@ -47,6 +46,7 @@ enum class ExprType
   COMPARISON,   ///< 需要做比较的表达式
   CONJUNCTION,  ///< 多个表达式使用同一种关系(AND或OR)来联结
   ARITHMETIC,   ///< 算术运算
+  VALUE_LIST,   ///< 值列表
   SUBQUERY,     ///< 子查询
   AGGREGATION,  ///< 聚合运算
 };
@@ -175,6 +175,115 @@ public:
 private:
   std::string table_name_;
   std::string field_name_;
+};
+
+class PhysicalOperator;
+class SubQueryExpr : public Expression
+{
+public:
+  explicit SubQueryExpr(SelectSqlNode &&selectSqlNode);
+  virtual ~SubQueryExpr() = default;
+
+  ExprType type() const override { return ExprType::SUBQUERY; }
+  AttrType value_type() const override { return AttrType::UNDEFINED; }
+
+  RC get_value(const Tuple &tuple, Value &value) const override { return RC::INTERNAL; }
+
+  RC try_get_value_fun(Value &value);
+
+  RC create_select(Db *db, bool should_one = true);
+
+private:
+  bool                              should_one_ = true;
+  SelectSqlNode                     select_;
+  std::unique_ptr<PhysicalOperator> oper_;
+};
+
+class ValueListExpr : public Expression
+{
+public:
+  ValueListExpr(std::vector<std::unique_ptr<Expression>> &&child) : children_(std::move(child)){};
+  ValueListExpr(std::unique_ptr<Expression> child) { children_.emplace_back(std::move(child)); }
+  virtual ~ValueListExpr() = default;
+
+  ExprType type() const override { return ExprType::VALUE_LIST; }
+  AttrType value_type() const override
+  {
+    if (value_list_.empty() && is_init_) {
+      return AttrType::NULLS;
+    }
+    return value_list_.size() == 1 ? value_list_[0].attr_type() : AttrType::UNDEFINED;
+  }
+
+  RC get_value(const Tuple &tuple, Value &value) const override
+  {
+    if (value_list_.size() != 1) {
+      value.set_null();
+      return RC::SUCCESS;
+    }
+    value = value_list_[0];
+    return RC::SUCCESS;
+  }
+
+  RC try_get_value(Value &value) const override
+  {
+    if (value_list_.size() != 1) {
+      value.set_null();
+      return RC::SUCCESS;
+    }
+    value = value_list_[0];
+    return RC::SUCCESS;
+  }
+
+  RC init()
+  {
+    if (is_init_) {
+      return RC::SUCCESS;
+    }
+
+    RC rc    = RC::SUCCESS;
+    is_init_ = true;
+    for (const auto &expr : children_) {
+      switch (expr->type()) {
+        case ExprType::VALUE: {
+          Value v;
+          rc = expr->try_get_value(v);
+          if (rc != RC::SUCCESS) {
+            return rc;
+          }
+          value_list_.emplace_back(v);
+          break;
+        }
+        case ExprType::SUBQUERY: {
+          SubQueryExpr *subquery_expr = static_cast<SubQueryExpr *>(expr.get());
+
+          Value v;
+
+          while ((rc = subquery_expr->try_get_value_fun(v)) == RC::SUCCESS) {
+            value_list_.emplace_back(v);
+          }
+
+          if (rc != RC::RECORD_EOF) {
+            return rc;
+          }
+          rc = RC::SUCCESS;
+
+          break;
+        };
+        default: return RC::INTERNAL;
+      }
+    }
+    return rc;
+  }
+
+  const std::vector<Value> &value_list() const { return value_list_; }
+
+  const char *name() const override { return "ValueListExpr"; }
+
+private:
+  bool                                     is_init_ = false;
+  std::vector<std::unique_ptr<Expression>> children_;
+  std::vector<Value>                       value_list_;
 };
 
 /**
@@ -313,6 +422,9 @@ public:
   RC compare_column(const Column &left, const Column &right, std::vector<uint8_t> &result) const;
 
 private:
+  RC compare_in(const Value &left, Value &value) const;
+
+private:
   CompOp                      comp_;
   std::unique_ptr<Expression> left_;
   std::unique_ptr<Expression> right_;
@@ -348,20 +460,6 @@ public:
 private:
   Type                                     conjunction_type_;
   std::vector<std::unique_ptr<Expression>> children_;
-};
-
-class SubqueryExpr : public Expression
-{
-public:
-  SubqueryExpr()          = default;
-  virtual ~SubqueryExpr() = default;
-
-  ExprType type() const override { return ExprType::SUBQUERY; }
-  AttrType value_type() const override { return AttrType::UNDEFINED; }
-
-  RC get_value(const Tuple &tuple, Value &value) const override { return RC::INTERNAL; }
-
-  const char *name() const override { return "SubqueryExpr"; }
 };
 
 /**

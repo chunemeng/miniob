@@ -6,7 +6,6 @@
 
 int DateType::compare(const Value &left, const Value &right) const
 {
-  LOG_INFO("DateType::compare left: %d, right: %d", left.value_.int_value_, right.value_.int_value_);
   return common::compare_int((void *)&left.value_.int_value_, (void *)&right.value_.int_value_);
 }
 

@@ -15,6 +15,9 @@ See the Mulan PSL v2 for more details. */
 #include "sql/expr/expression.h"
 #include "sql/expr/tuple.h"
 #include "sql/expr/arithmetic_operator.hpp"
+#include "sql/stmt/select_stmt.h"
+#include "sql/optimizer/optimize_stage.h"
+#include "sql/operator/project_physical_operator.h"
 
 using namespace std;
 
@@ -166,7 +169,9 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
     case NOT_LIKE: {
       result = (left.compare_like(right) != 0);
     } break;
-
+    case IN_OP: {
+      result = false;
+    } break;
     default: {
       LOG_WARN("unsupported comparison. %d", comp_);
       rc = RC::INTERNAL;
@@ -197,6 +202,41 @@ RC ComparisonExpr::try_get_value(Value &cell) const
   return RC::INVALID_ARGUMENT;
 }
 
+RC ComparisonExpr::compare_in(const Value &left, Value &value) const
+{
+  RC rc = RC::INVALID_ARGUMENT;
+  value.set_boolean(false);
+  if (right_->type() == ExprType::VALUE_LIST) {
+    if (left.attr_type() == AttrType::NULLS) {
+      return RC::SUCCESS;
+    }
+    auto right = static_cast<ValueListExpr *>(right_.get());
+
+    rc = right->init();
+
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to get value of right expression. rc=%s", strrc(rc));
+      return rc;
+    }
+
+    auto &values = right->value_list();
+
+    for (const Value &v : values) {
+      LOG_INFO("compare %s with %s", left.to_string().c_str(), v.to_string().c_str());
+      if (v.attr_type() == AttrType::NULLS) {
+        continue;
+      }
+      if (left.compare(v) == 0) {
+        value.set_boolean(true);
+        break;
+      }
+    }
+
+    return rc;
+  }
+  return rc;
+}
+
 RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
 {
   Value left_value;
@@ -207,6 +247,17 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
     LOG_WARN("failed to get value of left expression. rc=%s", strrc(rc));
     return rc;
   }
+
+  if (comp_ == IN_OP) {
+    return compare_in(left_value, value);
+  }
+
+  if (comp_ == NOT_IN) {
+    compare_in(left_value, value);
+    value.set_boolean(!value.get_boolean());
+    return RC::SUCCESS;
+  }
+
   rc = right_->get_value(tuple, right_value);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to get value of right expression. rc=%s", strrc(rc));
@@ -645,3 +696,73 @@ RC AggregateExpr::get_value(const Tuple &tuple, Value &value) const
 {
   return tuple.find_cell(TupleCellSpec(name()), value);
 }
+
+RC SubQueryExpr::create_select(Db *db, bool should_one)
+{
+  Stmt *stmt  = nullptr;
+  should_one_ = should_one;
+
+  RC rc = SelectStmt::create(db, select_, stmt);
+  if (rc != RC::SUCCESS) {
+    delete stmt;
+    return rc;
+  }
+  LogicalPlanGenerator  logical_plan_generator_;   ///< 根据SQL生成逻辑计划
+  PhysicalPlanGenerator physical_plan_generator_;  ///< 根据逻辑计划生成物理计划
+  Rewriter              rewriter_;                 ///< 逻辑计划改写
+
+  std::unique_ptr<LogicalOperator> logical_operator;
+  rc = logical_plan_generator_.create(stmt, logical_operator);
+
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to create logical plan. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  if (logical_operator == nullptr) {
+    LOG_WARN("logical operator is null");
+    return RC::SUCCESS;
+  }
+
+  bool change_made = false;
+  do {
+    change_made = false;
+    rc          = rewriter_.rewrite(logical_operator, change_made);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to do expression rewrite on logical plan in subquery. rc=%s", strrc(rc));
+      return rc;
+    }
+  } while (change_made);
+
+  rc = physical_plan_generator_.create(*logical_operator, oper_);
+  if (rc != RC::SUCCESS || oper_ == nullptr || oper_->type() != PhysicalOperatorType::PROJECT) {
+    LOG_WARN("failed to create physical operator in subquery. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  rc = oper_->open(nullptr);
+
+  return rc;
+}
+
+RC SubQueryExpr::try_get_value_fun(Value &value)
+{
+  if (oper_ == nullptr) {
+    return RC::SUCCESS;
+  }
+
+  RC rc = oper_->next();
+  if (rc == RC::SUCCESS) {
+    Tuple *tuple = oper_->current_tuple();
+    if (should_one_ && tuple->cell_num() != 1) {
+      return RC::INTERNAL;
+    }
+    return tuple->cell_at(0, value);
+  } else {
+    if (rc == RC::RECORD_EOF) {
+      oper_->close();
+    }
+    return rc;
+  }
+}
+SubQueryExpr::SubQueryExpr(SelectSqlNode &&selectSqlNode) : select_(std::move(selectSqlNode)) {}

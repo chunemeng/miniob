@@ -164,6 +164,7 @@ UnboundAggregateExpr *create_aggregate_expression(AggrType aggregate_name,
         AND
         SET
         ON
+        IN
         LOAD
         DATA
         INFILE
@@ -695,6 +696,14 @@ expression:
       $$->set_name(token_name(sql_string, &@$));
       delete $1;
     }
+    | LBRACE select_stmt RBRACE {
+       $$ = new SubQueryExpr(std::move($2->selection));
+       delete $2;
+    }
+    | LBRACE expression_list RBRACE {
+       $$ = new ValueListExpr(std::move(*$2));
+       delete $2;
+    }
     | '*' {
       $$ = new StarExpr();
     }
@@ -868,6 +877,8 @@ comp_op:
     | IS { $$ = IS_C;}
     | NOT LIKE  { $$ = NOT_LIKE; }
     | LIKE { $$ = LIKE_OP; }
+    | IN { $$ = IN_OP; }
+    | NOT IN { $$ = NOT_IN; }
     ;
 
 // your code here

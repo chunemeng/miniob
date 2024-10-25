@@ -377,6 +377,11 @@ RC PhysicalPlanGenerator::create_plan(GroupByLogicalOperator &logical_oper, std:
 
   ASSERT(logical_oper.children().size() == 1, "group by operator should have 1 child");
 
+  if (logical_oper.children().empty()) {
+    oper = nullptr;
+    return RC::SUCCESS;
+  }
+
   LogicalOperator             &child_oper = *logical_oper.children().front();
   unique_ptr<PhysicalOperator> child_physical_oper;
   rc = create(child_oper, child_physical_oper);

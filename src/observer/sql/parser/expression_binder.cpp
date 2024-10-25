@@ -69,6 +69,12 @@ RC ExpressionBinder::bind_expression(
     case ExprType::UNBOUND_AGGREGATION: {
       return bind_aggregate_expression(expr, bound_expressions);
     } break;
+    case ExprType::VALUE_LIST: {
+      return bind_valuelist_expression(expr, bound_expressions);
+    } break;
+    case ExprType::SUBQUERY: {
+      return bind_subquery_expression(expr, bound_expressions);
+    } break;
 
     case ExprType::FIELD: {
       return bind_field_expression(expr, bound_expressions);
@@ -268,6 +274,7 @@ RC ExpressionBinder::bind_comparison_expression(
   }
 
   child_bound_expressions.clear();
+
   rc = bind_expression(right_expr, child_bound_expressions);
   if (rc != RC::SUCCESS) {
     return rc;
@@ -281,6 +288,14 @@ RC ExpressionBinder::bind_comparison_expression(
   unique_ptr<Expression> &right = child_bound_expressions[0];
   if (right.get() != right_expr.get()) {
     right_expr.reset(right.release());
+  }
+
+  if (comparison_expr->comp() == IN_OP || comparison_expr->comp() == NOT_IN) {
+    if (right_expr->type() != ExprType::VALUE_LIST) {
+      return RC::INVALID_ARGUMENT;
+    }
+    bound_expressions.emplace_back(std::move(expr));
+    return RC::SUCCESS;
   }
 
   AttrType left_attr_type  = left_expr->value_type();
@@ -468,7 +483,6 @@ RC check_aggregate_expression(AggregateExpr &expression)
 RC ExpressionBinder::bind_aggregate_expression(
     unique_ptr<Expression> &expr, vector<unique_ptr<Expression>> &bound_expressions)
 {
-  LOG_DEBUG("bind aggregate expression");
   if (nullptr == expr) {
     return RC::SUCCESS;
   }
@@ -512,5 +526,40 @@ RC ExpressionBinder::bind_aggregate_expression(
   }
 
   bound_expressions.emplace_back(std::move(aggregate_expr));
+  return RC::SUCCESS;
+}
+RC ExpressionBinder::bind_subquery_expression(
+    unique_ptr<Expression> &expr, vector<std::unique_ptr<Expression>> &bound_expressions)
+{
+  if (nullptr == expr) {
+    return RC::SUCCESS;
+  }
+
+  auto subquery_expr = static_cast<SubQueryExpr *>(expr.get());
+  RC   rc            = subquery_expr->create_select(context_.get_db());
+  if (OB_FAIL(rc)) {
+    return rc;
+  }
+  auto value_list_expr = std::make_unique<ValueListExpr>(std::move(expr));
+  rc                   = value_list_expr->init();
+  if (OB_FAIL(rc)) {
+    return rc;
+  }
+
+  bound_expressions.emplace_back(std::move(value_list_expr));
+  return RC::SUCCESS;
+}
+RC ExpressionBinder::bind_valuelist_expression(
+    unique_ptr<Expression> &value_expr, vector<std::unique_ptr<Expression>> &bound_expressions)
+{
+  if (nullptr == value_expr) {
+    return RC::SUCCESS;
+  }
+  auto value_list_expr = static_cast<ValueListExpr *>(value_expr.get());
+  RC   rc              = value_list_expr->init();
+  if (OB_FAIL(rc)) {
+    return rc;
+  }
+  bound_expressions.emplace_back(std::move(value_expr));
   return RC::SUCCESS;
 }

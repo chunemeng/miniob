@@ -17,9 +17,8 @@ See the Mulan PSL v2 for more details. */
 #include <memory>
 #include <string>
 #include <vector>
-
-#include "common/rc.h"
 #include "sql/expr/tuple.h"
+#include "common/rc.h"
 
 class Record;
 class TupleCellSpec;

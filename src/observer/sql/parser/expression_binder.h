@@ -36,14 +36,18 @@ public:
     table_ordered_.emplace_back(table);
   }
 
+  void set_db(Db *db) { this->db_ = db; }
+
   Table *find_table(const char *table_name) const;
 
   Table *find_table(const std::string &table_name) const;
 
   std::unordered_map<std::string, Table *> &table_map() { return table_map_; }
   std::vector<Table *>                     &table_ordered() { return table_ordered_; }
+  Db                                       *get_db() const { return db_; }
 
 private:
+  Db                                      *db_ = nullptr;
   std::unordered_map<std::string, Table *> table_map_;
   // use for output the table in order
   std::vector<Table *> table_ordered_;
@@ -63,6 +67,8 @@ public:
       bool should_alis = false);
 
 private:
+  RC bind_subquery_expression(
+      std::unique_ptr<Expression> &subquery_expr, std::vector<std::unique_ptr<Expression>> &bound_expressions);
   RC bind_star_expression(std::unique_ptr<Expression> &star_expr,
       std::vector<std::unique_ptr<Expression>> &bound_expressions, bool should_alis = false);
   RC bind_unbound_field_expression(std::unique_ptr<Expression> &unbound_field_expr,
@@ -70,6 +76,8 @@ private:
   RC bind_field_expression(
       std::unique_ptr<Expression> &field_expr, std::vector<std::unique_ptr<Expression>> &bound_expressions);
   RC bind_value_expression(
+      std::unique_ptr<Expression> &value_expr, std::vector<std::unique_ptr<Expression>> &bound_expressions);
+  RC bind_valuelist_expression(
       std::unique_ptr<Expression> &value_expr, std::vector<std::unique_ptr<Expression>> &bound_expressions);
   RC bind_cast_expression(
       std::unique_ptr<Expression> &cast_expr, std::vector<std::unique_ptr<Expression>> &bound_expressions);

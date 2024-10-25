@@ -51,10 +51,12 @@ enum CompOp
   LESS_THAN,    ///< "<"
   GREAT_EQUAL,  ///< ">="
   GREAT_THAN,   ///< ">"
-  IS_C,           //
-  IS_NOT_C,       //
+  IS_C,         //
+  IS_NOT_C,     //
   LIKE_OP,
   NOT_LIKE,
+  IN_OP,
+  NOT_IN,
   NO_OP
 };
 
@@ -114,7 +116,7 @@ struct SelectSqlNode
   std::vector<std::unique_ptr<Expression>> expressions;  ///< 查询的表达式
   std::vector<std::string>                 relations;    ///< 查询的表
   std::vector<ConditionSqlNode>            conditions;   ///< 查询条件，使用AND串联起来多个条件
-  std::vector<InnerJoinSqlNode>            inner_joins;   ///< inner join
+  std::vector<InnerJoinSqlNode>            inner_joins;  ///< inner join
   std::vector<std::unique_ptr<Expression>> group_by;     ///< group by clause
 };
 
