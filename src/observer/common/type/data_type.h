@@ -82,6 +82,12 @@ public:
    */
   virtual RC to_string(const Value &val, string &result) const { return RC::UNSUPPORTED; }
 
+  virtual RC l2_distance(const Value &left, const Value &right, Value &result) const { return RC::UNSUPPORTED; }
+
+  virtual RC cosine_distance(const Value &left, const Value &right, Value &result) const { return RC::UNSUPPORTED; }
+
+  virtual RC inner_product(const Value &left, const Value &right, Value &result) const { return RC::UNSUPPORTED; }
+
   /**
    * @brief 计算从 type 到 attr_type 的隐式转换的 cost，如果无法转换，返回 INT32_MAX
    */

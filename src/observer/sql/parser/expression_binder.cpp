@@ -127,7 +127,6 @@ RC ExpressionBinder::bind_star_expression(
     auto &all_tables = context_.table_ordered();
     // don't change it to auto, because it may lose const & in std::string!!!
 
-
     for (auto table : all_tables) {
       wildcard_fields(table, bound_expressions, should_alis);
     }
@@ -430,11 +429,11 @@ RC check_aggregate_expression(AggregateExpr &expression)
   }
 
   // 校验数据类型与聚合类型是否匹配
-  AggregateExpr::Type aggregate_type   = expression.aggregate_type();
-  AttrType            child_value_type = child_expression->value_type();
+  AggrType aggregate_type   = expression.aggregate_type();
+  AttrType child_value_type = child_expression->value_type();
   switch (aggregate_type) {
-    case AggregateExpr::Type::SUM:
-    case AggregateExpr::Type::AVG: {
+    case AggrType::SUM:
+    case AggrType::AVG: {
       // 仅支持数值类型
       if (child_value_type != AttrType::INTS && child_value_type != AttrType::FLOATS &&
           child_value_type != AttrType::NULLS) {
@@ -443,9 +442,9 @@ RC check_aggregate_expression(AggregateExpr &expression)
       }
     } break;
 
-    case AggregateExpr::Type::COUNT:
-    case AggregateExpr::Type::MAX:
-    case AggregateExpr::Type::MIN: {
+    case AggrType::COUNT:
+    case AggrType::MAX:
+    case AggrType::MIN: {
       // 任何类型都支持
     } break;
   }
@@ -480,18 +479,13 @@ RC ExpressionBinder::bind_aggregate_expression(
     return RC::INVALID_ARGUMENT;
   }
 
-  const auto         &aggregate_name = unbound_aggregate_expr->aggregate_name();
-  AggregateExpr::Type aggregate_type;
-  RC                  rc = AggregateExpr::type_from_string(aggregate_name.c_str(), aggregate_type);
-  if (OB_FAIL(rc)) {
-    LOG_WARN("invalid aggregate name: %s", aggregate_name.c_str());
-    return rc;
-  }
+  auto aggregate_type = unbound_aggregate_expr->aggregate_name();
+  RC   rc             = RC::SUCCESS;
 
   unique_ptr<Expression>        &child_expr = unbound_aggregate_expr->child();
   vector<unique_ptr<Expression>> child_bound_expressions;
 
-  if (child_expr->type() == ExprType::STAR && aggregate_type == AggregateExpr::Type::COUNT) {
+  if (child_expr->type() == ExprType::STAR && aggregate_type == AggrType::COUNT) {
     ValueExpr *value_expr = new ValueExpr(Value(1));
     child_expr.reset(value_expr);
   } else {

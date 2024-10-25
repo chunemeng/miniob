@@ -378,6 +378,9 @@ public:
     MUL,
     DIV,
     NEGATIVE,
+    L2_NORM,
+    COSINE_SIMILARITY,
+    INNER_PRODUCT,
   };
 
 public:
@@ -424,42 +427,42 @@ private:
   std::unique_ptr<Expression> right_;
 };
 
+enum class AggrType
+{
+  COUNT,
+  SUM,
+  AVG,
+  MAX,
+  MIN,
+};
+
 class UnboundAggregateExpr : public Expression
 {
 public:
-  UnboundAggregateExpr(const char *aggregate_name, Expression *child);
-  UnboundAggregateExpr(const char *aggregate_name, std::unique_ptr<Expression> child);
+public:
+  UnboundAggregateExpr(AggrType aggregate_name, Expression *child);
+  UnboundAggregateExpr(AggrType aggregate_name, std::unique_ptr<Expression> child);
   virtual ~UnboundAggregateExpr() = default;
 
   ExprType type() const override { return ExprType::UNBOUND_AGGREGATION; }
-
-  const std::string &aggregate_name() const { return aggregate_name_; }
 
   std::unique_ptr<Expression> &child() { return child_; }
 
   RC       get_value(const Tuple &tuple, Value &value) const override { return RC::INTERNAL; }
   AttrType value_type() const override { return child_->value_type(); }
+  AggrType aggregate_name() const { return aggregate_name_; }
 
 private:
-  std::string                 aggregate_name_;
+  AggrType                    aggregate_name_;
   std::unique_ptr<Expression> child_;
 };
 
 class AggregateExpr : public Expression
 {
-public:
-  enum class Type
-  {
-    COUNT,
-    SUM,
-    AVG,
-    MAX,
-    MIN,
-  };
 
 public:
-  AggregateExpr(Type type, Expression *child);
-  AggregateExpr(Type type, std::unique_ptr<Expression> child);
+  AggregateExpr(AggrType type, Expression *child);
+  AggregateExpr(AggrType type, std::unique_ptr<Expression> child);
   virtual ~AggregateExpr() = default;
 
   bool equal(const Expression &other) const override;
@@ -473,7 +476,7 @@ public:
 
   RC get_column(Chunk &chunk, Column &column) override;
 
-  Type aggregate_type() const { return aggregate_type_; }
+  AggrType aggregate_type() const { return aggregate_type_; }
 
   std::unique_ptr<Expression> &child() { return child_; }
 
@@ -481,10 +484,7 @@ public:
 
   std::unique_ptr<Aggregator> create_aggregator() const;
 
-public:
-  static RC type_from_string(const char *type_str, Type &type);
-
 private:
-  Type                        aggregate_type_;
+  AggrType                    aggregate_type_;
   std::unique_ptr<Expression> child_;
 };

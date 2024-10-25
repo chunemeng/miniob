@@ -109,19 +109,22 @@ extern int yydebug;
     FORMAT = 310,                  /* FORMAT  */
     INNER = 311,                   /* INNER  */
     JOIN = 312,                    /* JOIN  */
-    NULL_L = 313,                  /* NULL_L  */
-    NULL_T = 314,                  /* NULL_T  */
-    EQ = 315,                      /* EQ  */
-    LT = 316,                      /* LT  */
-    GT = 317,                      /* GT  */
-    LE = 318,                      /* LE  */
-    GE = 319,                      /* GE  */
-    NE = 320,                      /* NE  */
-    NUMBER = 321,                  /* NUMBER  */
-    FLOAT = 322,                   /* FLOAT  */
-    ID = 323,                      /* ID  */
-    SSS = 324,                     /* SSS  */
-    UMINUS = 325                   /* UMINUS  */
+    L2_DIST = 313,                 /* L2_DIST  */
+    COS_DIST = 314,                /* COS_DIST  */
+    INNER_PRODUCT = 315,           /* INNER_PRODUCT  */
+    NULL_L = 316,                  /* NULL_L  */
+    NULL_T = 317,                  /* NULL_T  */
+    EQ = 318,                      /* EQ  */
+    LT = 319,                      /* LT  */
+    GT = 320,                      /* GT  */
+    LE = 321,                      /* LE  */
+    GE = 322,                      /* GE  */
+    NE = 323,                      /* NE  */
+    NUMBER = 324,                  /* NUMBER  */
+    FLOAT = 325,                   /* FLOAT  */
+    ID = 326,                      /* ID  */
+    SSS = 327,                     /* SSS  */
+    UMINUS = 328                   /* UMINUS  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -130,7 +133,7 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 185 "yacc_sql.y"
+#line 188 "yacc_sql.y"
 
   ParsedSqlNode *                            sql_node;
   ConditionSqlNode *                         condition;
@@ -152,7 +155,7 @@ union YYSTYPE
   int                                        number;
   float                                      floats;
 
-#line 156 "yacc_sql.hpp"
+#line 159 "yacc_sql.hpp"
 
 };
 typedef union YYSTYPE YYSTYPE;

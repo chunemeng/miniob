@@ -52,7 +52,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
   return expr;
 }
 
-UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
+UnboundAggregateExpr *create_aggregate_expression(AggrType aggregate_name,
                                            Expression *child,
                                            const char *sql_string,
                                            YYLTYPE *llocp)
@@ -62,7 +62,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   return expr;
 }
 
-UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
+UnboundAggregateExpr *create_aggregate_expression(AggrType aggregate_name,
                                            std::vector<RelAttrSqlNode>* child,
                                            const char *sql_string,
                                            YYLTYPE *llocp)
@@ -87,8 +87,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   }
 }
 
-UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
-                                           std::vector<std::unique_ptr<Expression>> child,
+UnboundAggregateExpr *create_aggregate_expression(AggrType aggregate_name,
+                                           std::vector<std::unique_ptr<Expression>>&& child,
                                            const char *sql_string,
                                            YYLTYPE *llocp)
 {
@@ -172,6 +172,9 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         FORMAT
         INNER
         JOIN
+        L2_DIST
+        COS_DIST
+        INNER_PRODUCT
         NULL_L
         NULL_T
         EQ
@@ -664,6 +667,16 @@ expression:
     | expression '/' expression {
       $$ = create_arithmetic_expression(ArithmeticExpr::Type::DIV, $1, $3, sql_string, &@$);
     }
+    | L2_DIST LBRACE expression COMMA expression RBRACE {
+      $$ = create_arithmetic_expression(ArithmeticExpr::Type::L2_NORM, $3, $5, sql_string, &@$);
+    }
+    | COS_DIST LBRACE expression COMMA expression RBRACE {
+      $$ = create_arithmetic_expression(ArithmeticExpr::Type::COSINE_SIMILARITY, $3, $5, sql_string, &@$);
+    }
+
+    | INNER_PRODUCT LBRACE expression COMMA expression RBRACE {
+      $$ = create_arithmetic_expression(ArithmeticExpr::Type::INNER_PRODUCT, $3, $5, sql_string, &@$);
+    }
     | LBRACE expression RBRACE {
       $$ = $2;
       $$->set_name(token_name(sql_string, &@$));
@@ -686,41 +699,40 @@ expression:
       $$ = new StarExpr();
     }
     | COUNT LBRACE rel_attr_list RBRACE {
-      $$ = create_aggregate_expression("COUNT",$3, sql_string, &@$);
+      $$ = create_aggregate_expression(AggrType::COUNT, $3, sql_string, &@$);
     }
     | SUM LBRACE rel_attr_list RBRACE {
-      $$ = create_aggregate_expression("SUM", $3, sql_string, &@$);
+      $$ = create_aggregate_expression(AggrType::SUM, $3, sql_string, &@$);
     }
     | AVG LBRACE rel_attr_list RBRACE {
-      $$ = create_aggregate_expression("AVG",$3, sql_string, &@$);
+      $$ = create_aggregate_expression(AggrType::AVG, $3, sql_string, &@$);
     }
     | MAX LBRACE rel_attr_list RBRACE {
-      $$ = create_aggregate_expression("MAX",$3, sql_string, &@$);
+      $$ = create_aggregate_expression(AggrType::MAX, $3, sql_string, &@$);
     }
     | MIN LBRACE rel_attr_list RBRACE {
-      $$ = create_aggregate_expression("MIN",$3, sql_string, &@$);
+      $$ = create_aggregate_expression(AggrType::MIN, $3, sql_string, &@$);
     }
-        | COUNT LBRACE expression_list RBRACE {
-          $$ = create_aggregate_expression("COUNT",std::move(*$3), sql_string, &@$);
-          delete $3;
-        }
-        | SUM LBRACE expression_list RBRACE {
-          $$ = create_aggregate_expression("SUM", std::move(*$3), sql_string, &@$);
-          delete $3;
-        }
-        | AVG LBRACE expression_list RBRACE {
-          $$ = create_aggregate_expression("AVG",std::move(*$3), sql_string, &@$);
-            delete $3;
-        }
-        | MAX LBRACE expression_list RBRACE {
-          $$ = create_aggregate_expression("MAX",std::move(*$3), sql_string, &@$);
-            delete $3;
-        }
-        | MIN LBRACE expression_list RBRACE {
-          $$ = create_aggregate_expression("MIN",std::move(*$3), sql_string, &@$);
-          delete $3;
-
-        }
+    | COUNT LBRACE expression_list RBRACE {
+      $$ = create_aggregate_expression(AggrType::COUNT, std::move(*$3), sql_string, &@$);
+      delete $3;
+    }
+    | SUM LBRACE expression_list RBRACE {
+      $$ = create_aggregate_expression(AggrType::SUM, std::move(*$3), sql_string, &@$);
+      delete $3;
+    }
+    | AVG LBRACE expression_list RBRACE {
+      $$ = create_aggregate_expression(AggrType::AVG, std::move(*$3), sql_string, &@$);
+      delete $3;
+    }
+    | MAX LBRACE expression_list RBRACE {
+      $$ = create_aggregate_expression(AggrType::MAX, std::move(*$3), sql_string, &@$);
+      delete $3;
+    }
+    | MIN LBRACE expression_list RBRACE {
+      $$ = create_aggregate_expression(AggrType::MIN, std::move(*$3), sql_string, &@$);
+      delete $3;
+    }
     // your code here
     ;
 

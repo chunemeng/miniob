@@ -18,6 +18,11 @@ See the Mulan PSL v2 for more details. */
  */
 class VectorType : public DataType
 {
+private:
+  float l2_norm_helper(const float *left, const float *right, int len) const;
+
+  float inner_product_helper(const float *left, const float *right, int len) const;
+
 public:
   VectorType() : DataType(AttrType::VECTORS) {}
   ~VectorType() override = default;
@@ -25,6 +30,12 @@ public:
   int compare(const Value &left, const Value &right) const override;
 
   RC cast_to(const Value &val, AttrType type, Value &result) const override;
+
+  RC l2_distance(const Value &left, const Value &right, Value &result) const override;
+
+  RC cosine_distance(const Value &left, const Value &right, Value &result) const override;
+
+  RC inner_product(const Value &left, const Value &right, Value &result) const override;
 
   RC add(const Value &left, const Value &right, Value &result) const override;
   RC subtract(const Value &left, const Value &right, Value &result) const override;

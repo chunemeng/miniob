@@ -93,6 +93,21 @@ public:
     return DataType::type_instance(value.attr_type())->cast_to(value, to_type, result);
   }
 
+  static RC l2_distance(const Value &left, const Value &right, Value &result)
+  {
+    return DataType::type_instance(AttrType::VECTORS)->l2_distance(left, right, result);
+  }
+
+  static RC cosine_distance(const Value &left, const Value &right, Value &result)
+  {
+    return DataType::type_instance(AttrType::VECTORS)->cosine_distance(left, right, result);
+  }
+
+  static RC inner_product(const Value &left, const Value &right, Value &result)
+  {
+    return DataType::type_instance(AttrType::VECTORS)->inner_product(left, right, result);
+  }
+
   static int cast_cost(AttrType from_type, AttrType to_type)
   {
     return DataType::type_instance(from_type)->cast_cost(to_type);
