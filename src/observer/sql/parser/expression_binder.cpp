@@ -274,6 +274,16 @@ RC ExpressionBinder::bind_comparison_expression(
   }
 
   child_bound_expressions.clear();
+  if (comparison_expr->comp() == EXISTS_C ||
+      comparison_expr->comp() == NOT_EXISTS) {
+    if (left_expr->type() != ExprType::VALUE_LIST) {
+      LOG_WARN("right expression should be null for exists or not exists");
+      return RC::INVALID_ARGUMENT;
+    }
+    bound_expressions.emplace_back(std::move(expr));
+    return RC::SUCCESS;
+  }
+
 
   rc = bind_expression(right_expr, child_bound_expressions);
   if (rc != RC::SUCCESS) {
@@ -290,7 +300,7 @@ RC ExpressionBinder::bind_comparison_expression(
     right_expr.reset(right.release());
   }
 
-  if (comparison_expr->comp() == IN_OP || comparison_expr->comp() == NOT_IN) {
+  if (comparison_expr->comp() == IN_OP || comparison_expr->comp() == NOT_IN ) {
     if (right_expr->type() != ExprType::VALUE_LIST) {
       return RC::INVALID_ARGUMENT;
     }

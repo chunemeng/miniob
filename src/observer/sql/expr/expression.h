@@ -225,6 +225,8 @@ public:
     return RC::SUCCESS;
   }
 
+  bool is_empty() const { return value_list_.empty(); }
+
   RC try_get_value(Value &value) const override
   {
     if (value_list_.size() != 1) {

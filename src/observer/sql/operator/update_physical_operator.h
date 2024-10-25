@@ -8,8 +8,8 @@
 class UpdatePhysicalOperator : public PhysicalOperator
 {
 public:
-  UpdatePhysicalOperator(Table *table, const FieldMeta *field_meta, Value *values, int value_amount)
-      : table_(table), field_meta_(field_meta), values_(values), value_amount(value_amount)
+  UpdatePhysicalOperator(Table *table, const FieldMeta *field_meta, std::unique_ptr<Expression> &&values)
+      : table_(table), field_meta_(field_meta), values_(std::move(values))
   {}
 
   virtual ~UpdatePhysicalOperator() = default;
@@ -26,8 +26,7 @@ private:
   Table           *table_      = nullptr;
   const FieldMeta *field_meta_ = nullptr;
   Trx             *trx_        = nullptr;
-  Value           *values_     = nullptr;
 
-  int                 value_amount;
-  std::vector<Record> records_;
+  std::unique_ptr<Expression> values_;
+  std::vector<Record>         records_;
 };

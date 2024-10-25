@@ -247,7 +247,7 @@ RC Table::insert_record(Record &record)
   return rc;
 }
 
-RC Table::update_record(Record &record, const FieldMeta *field_meta, Value *values, int value_num)
+RC Table::update_record(Record &record, const FieldMeta *field_meta, Value &value)
 {
   RC rc = RC::SUCCESS;
 
@@ -255,34 +255,30 @@ RC Table::update_record(Record &record, const FieldMeta *field_meta, Value *valu
   memcpy(data, record.data(), table_meta_.record_size());
   auto null_map = reinterpret_cast<int *>(data + table_meta_.null_field_offset());
 
-  for (int i = 0; i < value_num && OB_SUCC(rc); i++) {
-    const FieldMeta *field = field_meta;
-    const Value     &value = values[i];
-    // TODO: optimize this
-    if (value.attr_type() == AttrType::NULLS) {
-      if (!field->nullable()) {
-        LOG_WARN("insert null into not nullable field. table name:%s,field name:%s,value:%s ",
+  const FieldMeta *field = field_meta;
+
+  // TODO: optimize this
+  if (value.attr_type() == AttrType::NULLS) {
+    if (!field->nullable()) {
+      LOG_WARN("insert null into not nullable field. table name:%s,field name:%s,value:%s ",
             table_meta_.name(), field->name().c_str(), value.to_string().c_str());
-        rc = RC::INVALID_ARGUMENT;
-        break;
+      rc = RC::INVALID_ARGUMENT;
+    }
+    null_map[0] |= (1 << (field->field_id()));
+  } else {
+    if (field->type() != value.attr_type()) {
+      Value real_value;
+      rc = Value::cast_to(value, field->type(), real_value);
+      if (OB_FAIL(rc)) {
+        LOG_WARN("failed to cast value. table name:%s,field name:%s,value:%s ",
+            table_meta_.name(), field->name().c_str(), value.to_string().c_str());
       }
-      ASSERT(value_num <= 32, "can't support more than 32 fields");
-      null_map[0] |= (1 << (field->field_id()));
+      rc = set_value_to_record(data, real_value, field);
     } else {
-      if (field->type() != value.attr_type()) {
-        Value real_value;
-        rc = Value::cast_to(value, field->type(), real_value);
-        if (OB_FAIL(rc)) {
-          LOG_WARN("failed to cast value. table name:%s,field name:%s,value:%s ",
-            table_meta_.name(), field->name().c_str(), value.to_string().c_str());
-          break;
-        }
-        rc = set_value_to_record(data, real_value, field);
-      } else {
-        rc = set_value_to_record(data, value, field);
-      }
+      rc = set_value_to_record(data, value, field);
     }
   }
+
   Record new_record;
   new_record.set_data(data, table_meta_.record_size());
   new_record.set_rid(record.rid());

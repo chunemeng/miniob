@@ -241,6 +241,16 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
 {
   Value left_value;
   Value right_value;
+  if (comp_ == EXISTS_C || comp_ == NOT_EXISTS) {
+    bool is = comp_ == EXISTS_C;
+    if (right_->type() != ExprType::VALUE_LIST) {
+      LOG_WARN("right expression is not value list");
+      return RC::INVALID_ARGUMENT;
+    }
+    auto left = static_cast<ValueListExpr *>(left_.get());
+    value.set_boolean(left->value_list().empty() == is);
+    return RC::SUCCESS;
+  }
 
   RC rc = left_->get_value(tuple, left_value);
   if (rc != RC::SUCCESS) {
@@ -248,14 +258,16 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
     return rc;
   }
 
-  if (comp_ == IN_OP) {
-    return compare_in(left_value, value);
-  }
-
-  if (comp_ == NOT_IN) {
-    compare_in(left_value, value);
-    value.set_boolean(!value.get_boolean());
-    return RC::SUCCESS;
+  switch (comp_) {
+    case IN_OP: return compare_in(left_value, value);
+    case NOT_IN:
+      rc = compare_in(left_value, value);
+      if (rc != RC::SUCCESS) {
+        return rc;
+      }
+      value.set_boolean(!value.get_boolean());
+      return RC::SUCCESS;
+    default: break;
   }
 
   rc = right_->get_value(tuple, right_value);

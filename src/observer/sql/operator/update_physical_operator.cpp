@@ -36,8 +36,16 @@ RC UpdatePhysicalOperator::open(Trx *trx)
 
   rc = RC::SUCCESS;
 
+  Value value;
+  rc = values_->try_get_value(value);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to get value: %s", strrc(rc));
+    return rc;
+  }
+
   for (Record &record : records_) {
-    rc = table_->update_record(record, field_meta_, values_, value_amount);
+
+    rc = table_->update_record(record, field_meta_, value);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to update record: %s", strrc(rc));
       return rc;

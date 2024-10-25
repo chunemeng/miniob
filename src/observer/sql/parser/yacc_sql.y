@@ -129,6 +129,7 @@ UnboundAggregateExpr *create_aggregate_expression(AggrType aggregate_name,
         INDEX
         CALC
         SELECT
+        EXISTS
         DESC
         SHOW
         SYNC
@@ -585,16 +586,17 @@ delete_stmt:    /*  delete 语句的语法解析树*/
     }
     ;
 update_stmt:      /*  update 语句的语法解析树*/
-    UPDATE ID SET ID EQ value where 
+    UPDATE ID SET ID EQ expression where
     {
       $$ = new ParsedSqlNode(SCF_UPDATE);
       $$->update.relation_name = $2;
       $$->update.attribute_name = $4;
-      $$->update.value = *$6;
+      $$->update.value = $6;
       if ($7 != nullptr) {
         $$->update.conditions.swap(*$7);
         delete $7;
       }
+      $6 = nullptr;
       free($2);
       free($4);
     }
@@ -863,6 +865,16 @@ condition:
     {
       $$ = new ConditionSqlNode;
       $$->condition = create_comparison_expression($2, $1, $3, sql_string, &@$);
+    }
+    | EXISTS expression
+    {
+      $$ = new ConditionSqlNode;
+      $$->condition = create_comparison_expression(EXISTS_C, $2, nullptr, sql_string, &@$);
+    }
+    | NOT EXISTS expression
+    {
+      $$ = new ConditionSqlNode;
+      $$->condition = create_comparison_expression(NOT_EXISTS, $3, nullptr, sql_string, &@$);
     }
     ;
 
