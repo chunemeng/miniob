@@ -44,7 +44,6 @@ RC UpdatePhysicalOperator::open(Trx *trx)
   }
 
   for (Record &record : records_) {
-
     rc = table_->update_record(record, field_meta_, value);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to update record: %s", strrc(rc));

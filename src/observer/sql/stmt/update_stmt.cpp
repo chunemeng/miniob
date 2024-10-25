@@ -51,7 +51,6 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
     LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name.c_str());
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
-  binder_context.add_table(table_name, table);
 
   ExpressionBinder                         binder(binder_context);
   std::vector<std::unique_ptr<Expression>> exprs;
@@ -61,6 +60,7 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
     LOG_WARN("failed to bind expression. rc=%d:%s", rc, strrc(rc));
     return rc;
   }
+
   if (exprs.size() != 1) {
     LOG_WARN("invalid expression. exprs.size=%d", static_cast<int>(exprs.size()));
     return RC::INVALID_ARGUMENT;
