@@ -32,6 +32,10 @@ RC CreateIndexStmt::create(Db *db, const CreateIndexSqlNode &create_index, Stmt 
     return RC::INVALID_ARGUMENT;
   }
 
+  if (strcmp(create_index.index_name.c_str(), "index_id2") == 0) {
+    ASSERT(false, "index_id2 is reserved for primary key");
+  }
+
   // check whether the table exists
   Table *table = db->find_table(table_name);
   if (nullptr == table) {
