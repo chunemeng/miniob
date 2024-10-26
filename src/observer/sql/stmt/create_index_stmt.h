@@ -29,7 +29,7 @@ class FieldMeta;
 class CreateIndexStmt : public Stmt
 {
 public:
-  CreateIndexStmt(Table *table, std::vector<const FieldMeta *> &&field_meta, const std::string &index_name, bool unique)
+  CreateIndexStmt(Table *table, std::vector<const FieldMeta *> &field_meta, const std::string &index_name, bool unique)
       : table_(table), index_fields_(std::move(field_meta)), index_name_(index_name), unique_(unique)
   {}
 
