@@ -726,12 +726,14 @@ RC Table::update_record(Record &record, vector<const FieldMeta *> &field_meta, v
   if (rc2 != RC::SUCCESS) {
     LOG_ERROR("Failed to rollback index data when insert index entries failed. table name=%s, rc=%d:%s",
                 name().c_str(), rc2, strrc(rc2));
+    return rc2;
   }
 
   rc2 = insert_record(new_record);
   if (rc2 != RC::SUCCESS) {
     LOG_PANIC("Failed to rollback record data when insert index entries failed. table name=%s, rc=%d:%s",
                 name().c_str(), rc2, strrc(rc2));
+    return rc2;
   }
 
   return rc;
