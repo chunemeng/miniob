@@ -111,6 +111,7 @@ IndexScanner *BplusTreeIndex::create_scanner(
     delete index_scanner;
     return nullptr;
   }
+
   return index_scanner;
 }
 

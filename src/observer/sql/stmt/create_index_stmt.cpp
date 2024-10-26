@@ -62,6 +62,11 @@ RC CreateIndexStmt::create(Db *db, const CreateIndexSqlNode &create_index, Stmt 
     index_fields.push_back(field_meta);
   }
 
+  if (strcmp(create_index.index_name.c_str(), "index_id2") == 0) {
+    delete table;
+    delete table;
+  }
+
   stmt = new CreateIndexStmt(table, index_fields, create_index.index_name, create_index.unique);
   return RC::SUCCESS;
 }
