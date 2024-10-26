@@ -22,22 +22,30 @@ See the Mulan PSL v2 for more details. */
 const static Json::StaticString FIELD_NAME("name");
 const static Json::StaticString FIELD_FIELD_NAME("field_name");
 
-RC IndexMeta::init(const char *name, const FieldMeta &field)
+RC IndexMeta::init(const char *name, std::vector<const FieldMeta *> &fields)
 {
   if (common::is_blank(name)) {
     LOG_ERROR("Failed to init index, name is empty.");
     return RC::INVALID_ARGUMENT;
   }
 
-  name_  = name;
-  field_ = field.name();
+  name_ = name;
+  for (const FieldMeta *field : fields) {
+    field_.push_back(field->name());
+  }
+
   return RC::SUCCESS;
 }
 
 void IndexMeta::to_json(Json::Value &json_value) const
 {
-  json_value[FIELD_NAME]       = name_;
-  json_value[FIELD_FIELD_NAME] = field_;
+  json_value[FIELD_NAME] = name_;
+  Json::Value fields_value;
+  for (const auto &field : field_) {
+    fields_value.append(field);
+  }
+
+  json_value[FIELD_FIELD_NAME] = std::move(fields_value);
 }
 
 RC IndexMeta::from_json(const TableMeta &table, const Json::Value &json_value, IndexMeta &index)
@@ -49,23 +57,47 @@ RC IndexMeta::from_json(const TableMeta &table, const Json::Value &json_value, I
     return RC::INTERNAL;
   }
 
-  if (!field_value.isString()) {
-    LOG_ERROR("Field name of index [%s] is not a string. json value=%s",
-        name_value.asCString(), field_value.toStyledString().c_str());
-    return RC::INTERNAL;
+  if (!field_value.empty()) {
+    if (!field_value.isArray()) {
+      LOG_ERROR("Invalid table meta. indexes is not array, json value=%s", field_value.toStyledString().c_str());
+      return RC::INTERNAL;
+    }
+
+    const int                index_num = field_value.size();
+    std::vector<std::string> fields;
+    fields.reserve(index_num);
+    for (int i = 0; i < index_num; i++) {
+      fields.emplace_back(field_value[i].asString());
+      const FieldMeta *field = table.field(fields[i].c_str());
+      if (nullptr == field) {
+        LOG_ERROR("Deserialize index [%s]: no such field: %s", name_value.asCString(), field_value.asCString());
+        return RC::SCHEMA_FIELD_MISSING;
+      }
+    }
+    return index.init(name_value.asCString(), fields);
   }
 
-  const FieldMeta *field = table.field(field_value.asCString());
-  if (nullptr == field) {
-    LOG_ERROR("Deserialize index [%s]: no such field: %s", name_value.asCString(), field_value.asCString());
-    return RC::SCHEMA_FIELD_MISSING;
-  }
-
-  return index.init(name_value.asCString(), *field);
+  return RC::INTERNAL;
 }
 
 const char *IndexMeta::name() const { return name_.c_str(); }
 
-const char *IndexMeta::field() const { return field_.c_str(); }
+const std::vector<std::string> &IndexMeta::field() const { return field_; }
 
-void IndexMeta::desc(ostream &os) const { os << "index name=" << name_ << ", field=" << field_; }
+void IndexMeta::desc(ostream &os) const
+{
+  os << "index name=" << name_ << ", field=";
+  for (const auto &field : field_) {
+    os << field << ", ";
+  }
+}
+RC IndexMeta::init(const char *name, vector<std::string> &fields)
+{
+  if (common::is_blank(name)) {
+    LOG_ERROR("Failed to init index, name is empty.");
+    return RC::INVALID_ARGUMENT;
+  }
+  name_  = name;
+  field_ = std::move(fields);
+  return RC::SUCCESS;
+}

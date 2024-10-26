@@ -30,5 +30,5 @@ int NULLType::compare(const Value &left, const Value &right) const {
   if (right.attr_type() == AttrType::NULLS) {
     return 0;
   }
-  return INT32_MAX;
+  return left.attr_type() == AttrType::NULLS ? 1 : -1;
 }

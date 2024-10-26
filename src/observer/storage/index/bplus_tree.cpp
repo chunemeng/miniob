@@ -844,14 +844,102 @@ RC BplusTreeHandler::create(LogHandler &log_handler, DiskBufferPool &buffer_pool
     return RC::INTERNAL;
   }
 
+  std::vector<AttrTypeInfo> attr_type_infos;
+  attr_type_infos.emplace_back(attr_type, attr_length, 0);
+
   char            *pdata         = header_frame->data();
   IndexFileHeader *file_header   = (IndexFileHeader *)pdata;
-  file_header->attr_length       = attr_length;
   file_header->key_length        = attr_length + sizeof(RID);
-  file_header->attr_type         = attr_type;
   file_header->internal_max_size = internal_max_size;
   file_header->leaf_max_size     = leaf_max_size;
   file_header->root_page         = BP_INVALID_PAGE_NUM;
+  file_header->attr_size         = 1;
+  // 取消记录日志的原因请参考下面的sync调用的地方。
+  // mtr.logger().init_header_page(header_frame, *file_header);
+
+  header_frame->mark_dirty();
+
+  memcpy(&file_header_, pdata, sizeof(file_header_));
+  header_dirty_ = false;
+
+  mem_pool_item_ = make_unique<common::MemPoolItem>("b+tree");
+  if (mem_pool_item_->init(file_header->key_length) < 0) {
+    LOG_WARN("Failed to init memory pool for index");
+    close();
+    return RC::NOMEM;
+  }
+
+  key_comparator_.init(attr_type_infos, attr_length, 0);
+  key_printer_.init(attr_type_infos, attr_length, 0);
+
+  /*
+  虽然我们针对B+树记录了WAL，但是我们记录的都是逻辑日志，并没有记录某个页面如何修改的物理日志。
+  在做恢复时，必须先创建出来一个tree handler对象。但是如果元数据页面不正确的话，我们无法创建一个正确的tree handler对象。
+  因此这里取消第一次元数据页面修改的WAL记录，而改用更简单的方式，直接将元数据页面刷到磁盘。
+  */
+  rc = this->sync();
+  if (OB_FAIL(rc)) {
+    LOG_WARN("failed to sync index header. rc=%d:%s", rc, strrc(rc));
+    return rc;
+  }
+
+  LOG_INFO("Successfully create index");
+  return RC::SUCCESS;
+}
+
+RC BplusTreeHandler::create(LogHandler &log_handler, DiskBufferPool &buffer_pool,
+    std::vector<const FieldMeta *> &field_metas, int null_field_num, int internal_max_size, int leaf_max_size)
+{
+
+  std::vector<AttrTypeInfo> attr_type_infos;
+  int                       attr_length = 0;
+  for (const FieldMeta *field_meta : field_metas) {
+    int len = field_meta->len();
+    attr_length += len;
+    attr_type_infos.emplace_back(field_meta->type(), len, field_meta->offset());
+  }
+
+  if (internal_max_size < 0) {
+    internal_max_size = calc_internal_page_capacity(attr_length);
+  }
+  if (leaf_max_size < 0) {
+    leaf_max_size = calc_leaf_page_capacity(attr_length);
+  }
+
+  log_handler_      = &log_handler;
+  disk_buffer_pool_ = &buffer_pool;
+
+  RC rc = RC::SUCCESS;
+
+  BplusTreeMiniTransaction mtr(*this, &rc);
+
+  Frame *header_frame = nullptr;
+
+  rc = mtr.latch_memo().allocate_page(header_frame);
+  if (OB_FAIL(rc)) {
+    LOG_WARN("failed to allocate header page for bplus tree. rc=%d:%s", rc, strrc(rc));
+    return rc;
+  }
+
+  if (header_frame->page_num() != FIRST_INDEX_PAGE) {
+    LOG_WARN("header page num should be %d but got %d. is it a new file",
+             FIRST_INDEX_PAGE, header_frame->page_num());
+    return RC::INTERNAL;
+  }
+
+  char            *pdata         = header_frame->data();
+  IndexFileHeader *file_header   = (IndexFileHeader *)pdata;
+  file_header->key_length        = attr_length + sizeof(RID);
+  file_header->internal_max_size = internal_max_size;
+  file_header->leaf_max_size     = leaf_max_size;
+  file_header->root_page         = BP_INVALID_PAGE_NUM;
+  file_header->attr_size         = field_metas.size();
+  file_header->attr_length       = attr_length;
+  file_header->null_field_num    = null_field_num;
+
+  for (int i = 0; i < field_metas.size(); i++) {
+    file_header->attr_info[i] = attr_type_infos[i];
+  }
 
   // 取消记录日志的原因请参考下面的sync调用的地方。
   // mtr.logger().init_header_page(header_frame, *file_header);
@@ -868,8 +956,8 @@ RC BplusTreeHandler::create(LogHandler &log_handler, DiskBufferPool &buffer_pool
     return RC::NOMEM;
   }
 
-  key_comparator_.init(file_header->attr_type, file_header->attr_length);
-  key_printer_.init(file_header->attr_type, file_header->attr_length);
+  key_comparator_.init(attr_type_infos, attr_length, null_field_num);
+  key_printer_.init(attr_type_infos, attr_length, null_field_num);
 
   /*
   虽然我们针对B+树记录了WAL，但是我们记录的都是逻辑日志，并没有记录某个页面如何修改的物理日志。
@@ -940,8 +1028,14 @@ RC BplusTreeHandler::open(LogHandler &log_handler, DiskBufferPool &buffer_pool)
   // close old page_handle
   buffer_pool.unpin_page(frame);
 
-  key_comparator_.init(file_header_.attr_type, file_header_.attr_length);
-  key_printer_.init(file_header_.attr_type, file_header_.attr_length);
+  std::vector<AttrTypeInfo> attr_type_infos;
+  for (int i = 0; i < file_header_.attr_size; i++) {
+    attr_type_infos.emplace_back(
+        file_header_.attr_info[i].type, file_header_.attr_info[i].length, file_header_.attr_info[i].offset);
+  }
+
+  key_comparator_.init(attr_type_infos, file_header_.attr_size, file_header_.null_field_num);
+  key_printer_.init(attr_type_infos, file_header_.attr_size, file_header_.null_field_num);
   LOG_INFO("Successfully open index");
   return RC::SUCCESS;
 }
@@ -1432,8 +1526,14 @@ RC BplusTreeHandler::recover_init_header_page(
   header_dirty_ = false;
   frame->mark_dirty();
 
-  key_comparator_.init(file_header_.attr_type, file_header_.attr_length);
-  key_printer_.init(file_header_.attr_type, file_header_.attr_length);
+  std::vector<AttrTypeInfo> attr_type_infos;
+  for (int i = 0; i < file_header_.attr_size; i++) {
+    attr_type_infos.emplace_back(
+        file_header_.attr_info[i].type, file_header_.attr_info[i].length, file_header_.attr_info[i].offset);
+  }
+
+  key_comparator_.init(attr_type_infos, file_header_.attr_length, file_header_.null_field_num);
+  key_printer_.init(attr_type_infos, file_header_.attr_length, file_header_.null_field_num);
 
   return RC::SUCCESS;
 }
@@ -1813,6 +1913,34 @@ RC BplusTreeHandler::delete_entry(const char *user_key, const RID *rid)
   rc = delete_entry_internal(mtr, leaf_frame, key);
   return rc;
 }
+RC BplusTreeHandler::create(LogHandler &log_handler, BufferPoolManager &bpm, const char *file_name,
+    vector<const FieldMeta *> &field_metas, int null_field_num, int internal_max_size, int leaf_max_size)
+{
+  RC rc = bpm.create_file(file_name);
+  if (OB_FAIL(rc)) {
+    LOG_WARN("Failed to create file. file name=%s, rc=%d:%s", file_name, rc, strrc(rc));
+    return rc;
+  }
+  LOG_INFO("Successfully create index file:%s", file_name);
+
+  DiskBufferPool *bp = nullptr;
+
+  rc = bpm.open_file(log_handler, file_name, bp);
+  if (OB_FAIL(rc)) {
+    LOG_WARN("Failed to open file. file name=%s, rc=%d:%s", file_name, rc, strrc(rc));
+    return rc;
+  }
+  LOG_INFO("Successfully open index file %s.", file_name);
+
+  rc = this->create(log_handler, *bp, field_metas, null_field_num, internal_max_size, leaf_max_size);
+  if (OB_FAIL(rc)) {
+    bpm.close_file(file_name);
+    return rc;
+  }
+
+  LOG_INFO("Successfully create index file %s.", file_name);
+  return rc;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1861,7 +1989,7 @@ RC BplusTreeScanner::open(const char *left_user_key, int left_len, bool left_inc
   } else {
 
     char *fixed_left_key = const_cast<char *>(left_user_key);
-    if (tree_handler_.file_header_.attr_type == AttrType::CHARS) {
+    if (tree_handler_.file_header_.attr_info[tree_handler_.file_header_.null_field_num].type == AttrType::CHARS) {
       bool should_inclusive_after_fix = false;
       rc = fix_user_key(left_user_key, left_len, true /*greater*/, &fixed_left_key, &should_inclusive_after_fix);
       if (OB_FAIL(rc)) {
@@ -1928,7 +2056,7 @@ RC BplusTreeScanner::open(const char *left_user_key, int left_len, bool left_inc
 
     char *fixed_right_key          = const_cast<char *>(right_user_key);
     bool  should_include_after_fix = false;
-    if (tree_handler_.file_header_.attr_type == AttrType::CHARS) {
+    if (tree_handler_.file_header_.attr_info[tree_handler_.file_header_.null_field_num].type == AttrType::CHARS) {
       rc = fix_user_key(right_user_key, right_len, false /*want_greater*/, &fixed_right_key, &should_include_after_fix);
       if (OB_FAIL(rc)) {
         LOG_WARN("failed to fix right user key. rc=%s", strrc(rc));
@@ -2046,7 +2174,7 @@ RC BplusTreeScanner::fix_user_key(
   }
 
   // 这里很粗暴，变长字段才需要做调整，其它默认都不需要做调整
-  assert(tree_handler_.file_header_.attr_type == AttrType::CHARS);
+  assert(tree_handler_.file_header_.attr_info[tree_handler_.file_header_.null_field_num].type == AttrType::CHARS);
   assert(strlen(user_key) >= static_cast<size_t>(key_len));
 
   *should_inclusive = false;

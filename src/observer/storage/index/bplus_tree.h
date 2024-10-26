@@ -49,6 +49,14 @@ enum class BplusTreeOperationType
   DELETE,
 };
 
+struct AttrTypeInfo
+{
+  AttrType type;
+  int      length;
+  int      offset;
+  int      field_id;
+};
+
 /**
  * @brief 属性比较(BplusTree)
  * @ingroup BPlusTree
@@ -56,9 +64,11 @@ enum class BplusTreeOperationType
 class AttrComparator
 {
 public:
-  void init(AttrType type, int length)
+  void init(std::vector<AttrTypeInfo> &infos, int length, int null_num)
   {
-    attr_type_   = type;
+    null_field_num_ = null_num;
+    attr_types_.resize(infos.size());
+    memcpy(attr_types_.data(), infos.data(), infos.size() * sizeof(AttrTypeInfo));
     attr_length_ = length;
   }
 
@@ -67,18 +77,38 @@ public:
   int operator()(const char *v1, const char *v2) const
   {
     // TODO: optimized the comparison
-    Value left;
-    left.set_type(attr_type_);
-    left.set_data(v1, attr_length_);
-    Value right;
-    right.set_type(attr_type_);
-    right.set_data(v2, attr_length_);
-    return DataType::type_instance(attr_type_)->compare(left, right);
+    auto null_map1 = (uint8_t *)(v1);
+    auto null_map2 = (uint8_t *)(v2);
+
+    for (int i = null_field_num_; i < attr_types_.size(); i++) {
+      Value left;
+      int   field_id = attr_types_[i].field_id;
+      if (null_map1[field_id / 8] & (1 << (field_id % 8))) {
+        left.set_null();
+      } else {
+        left.set_type(attr_types_[i].type);
+        left.set_data(v1 + attr_types_[i].offset, attr_types_[i].length);
+      }
+      Value right;
+      if (null_map2[field_id / 8] & (1 << (field_id % 8))) {
+        right.set_null();
+      } else {
+        right.set_type(attr_types_[i].type);
+        right.set_data(v2 + attr_types_[i].offset, attr_types_[i].length);
+      }
+
+      int result = DataType::type_instance(attr_types_[i].type)->compare(left, right);
+      if (result != 0) {
+        return result;
+      }
+    }
+    return 0;
   }
 
 private:
-  AttrType attr_type_;
-  int      attr_length_;
+  std::vector<AttrTypeInfo> attr_types_;
+  int                       attr_length_;
+  int                       null_field_num_;
 };
 
 /**
@@ -89,7 +119,10 @@ private:
 class KeyComparator
 {
 public:
-  void init(AttrType type, int length) { attr_comparator_.init(type, length); }
+  void init(std::vector<AttrTypeInfo> &infos, int length, int null_num)
+  {
+    attr_comparator_.init(infos, length, null_num);
+  }
 
   const AttrComparator &attr_comparator() const { return attr_comparator_; }
 
@@ -116,23 +149,42 @@ private:
 class AttrPrinter
 {
 public:
-  void init(AttrType type, int length)
+  void init(std::vector<AttrTypeInfo> &infos, int length, int null_num)
   {
-    attr_type_   = type;
-    attr_length_ = length;
+    attr_types_.resize(infos.size());
+    memcpy(attr_types_.data(), infos.data(), infos.size() * sizeof(AttrTypeInfo));
+    attr_length_    = length;
+    null_field_num_ = null_num;
   }
 
   int attr_length() const { return attr_length_; }
 
   string operator()(const char *v) const
   {
-    Value value(attr_type_, const_cast<char *>(v), attr_length_);
-    return value.to_string();
+    std::string s;
+    auto        null_map = (uint8_t *)(v);
+
+    for (int i = null_field_num_; i < attr_types_.size(); i++) {
+      if (i != null_field_num_) {
+        s += ",";
+      }
+      Value left;
+      int   field_id = attr_types_[i].field_id;
+      if (null_map[field_id / 8] & (1 << (field_id % 8))) {
+        s += "NULL";
+      } else {
+        left.set_type(attr_types_[i].type);
+        left.set_data(v + attr_types_[i].offset, attr_types_[i].length);
+        s += left.to_string();
+      }
+    }
+    return s;
   }
 
 private:
-  AttrType attr_type_;
-  int      attr_length_;
+  std::vector<AttrTypeInfo> attr_types_;
+  int                       null_field_num_;
+  int                       attr_length_;
 };
 
 /**
@@ -142,7 +194,7 @@ private:
 class KeyPrinter
 {
 public:
-  void init(AttrType type, int length) { attr_printer_.init(type, length); }
+  void init(std::vector<AttrTypeInfo> &infos, int length, int null_num) { attr_printer_.init(infos, length, null_num); }
 
   const AttrPrinter &attr_printer() const { return attr_printer_; }
 
@@ -173,23 +225,35 @@ struct IndexFileHeader
     memset(this, 0, sizeof(IndexFileHeader));
     root_page = BP_INVALID_PAGE_NUM;
   }
-  PageNum  root_page;          ///< 根节点在磁盘中的页号
-  int32_t  internal_max_size;  ///< 内部节点最大的键值对数
-  int32_t  leaf_max_size;      ///< 叶子节点最大的键值对数
-  int32_t  attr_length;        ///< 键值的长度
-  int32_t  key_length;         ///< attr length + sizeof(RID)
-  AttrType attr_type;          ///< 键值的类型
+  PageNum root_page;          ///< 根节点在磁盘中的页号
+  int32_t internal_max_size;  ///< 内部节点最大的键值对数
+  int32_t leaf_max_size;      ///< 叶子节点最大的键值对数
+  int32_t key_length;         ///< attr length + sizeof(RID)
+  int32_t null_field_num;     ///< null field number
+  int32_t attr_length;        ///< attr length
+  int32_t attr_size;          ///< attr size
+  // NOTE: 32 IS MAX SUPPORT FOR ONE NULL FIELD
+  AttrTypeInfo attr_info[32];
 
   const string to_string() const
   {
     stringstream ss;
-
-    ss << "attr_length:" << attr_length << ","
+    ss << "null_field_num:" << null_field_num << ","
+       << "attr_length:" << attr_length << ","
+       << "attr_size:" << attr_size << ","
        << "key_length:" << key_length << ","
-       << "attr_type:" << attr_type_to_string(attr_type) << ","
        << "root_page:" << root_page << ","
        << "internal_max_size:" << internal_max_size << ","
-       << "leaf_max_size:" << leaf_max_size << ";";
+       << "leaf_max_size:" << leaf_max_size;
+    ss << "attr_types:";
+    for (int i = 0; i < attr_size; i++) {
+      if (i != 0) {
+        ss << ",";
+      }
+
+      ss << attr_type_to_string(attr_info[i].type) << "(" << attr_info[i].length << ")";
+    }
+    ss << ";";
 
     return ss.str();
   }
@@ -463,6 +527,11 @@ public:
       int internal_max_size = -1, int leaf_max_size = -1);
   RC create(LogHandler &log_handler, DiskBufferPool &buffer_pool, AttrType attr_type, int attr_length,
       int internal_max_size = -1, int leaf_max_size = -1);
+  RC create(LogHandler &log_handler, BufferPoolManager &bpm, const char *file_name,
+      std::vector<const FieldMeta *> &field_metas, int null_field_num, int internal_max_size = -1,
+      int leaf_max_size = -1);
+  RC create(LogHandler &log_handler, DiskBufferPool &bpm, std::vector<const FieldMeta *> &field_metas,
+      int null_field_num, int internal_max_size = -1, int leaf_max_size = -1);
 
   /**
    * @brief 打开一个B+树

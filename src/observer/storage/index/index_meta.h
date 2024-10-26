@@ -35,11 +35,12 @@ class IndexMeta
 public:
   IndexMeta() = default;
 
-  RC init(const char *name, const FieldMeta &field);
+  RC init(const char *name, std::vector<const FieldMeta *> &fields);
+  RC init(const char *name, std::vector<std::string> &fields);
 
 public:
   const char *name() const;
-  const char *field() const;
+  const std::vector<std::string > &field() const;
 
   void desc(ostream &os) const;
 
@@ -49,5 +50,5 @@ public:
 
 protected:
   string name_;   // index's name
-  string field_;  // field's name
+  std::vector<string> field_;  // field's name
 };

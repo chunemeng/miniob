@@ -195,10 +195,21 @@ RC Table::open(Db *db, const char *meta_file, const char *base_dir)
   const int index_num = table_meta_.index_num();
   for (int i = 0; i < index_num; i++) {
     const IndexMeta *index_meta = table_meta_.index(i);
-    const FieldMeta *field_meta = table_meta_.field(index_meta->field());
-    if (field_meta == nullptr) {
-      LOG_ERROR("Found invalid index meta info which has a non-exists field. table=%s, index=%s, field=%s",
-                name().c_str(), index_meta->name(), index_meta->field());
+    std::vector<const FieldMeta *> field_meta;
+    for (const auto &field_name : index_meta->field()) {
+      const FieldMeta *field = table_meta_.field(field_name.c_str());
+      if (field == nullptr) {
+        LOG_ERROR("Failed to open index. table=%s, index=%s, field=%s",
+                  name().c_str(), index_meta->name(), field_name.c_str());
+        // skip cleanup
+        //  do all cleanup action in destructive Table function
+        return RC::INTERNAL;
+      }
+      field_meta.push_back(field);
+    }
+    if (field_meta.empty()) {
+      LOG_ERROR("Found invalid index meta info which has a non-exists field. table=%s, index=%s",
+                name().c_str(), index_meta->name());
       // skip cleanup
       //  do all cleanup action in destructive Table function
       return RC::INTERNAL;
@@ -207,7 +218,7 @@ RC Table::open(Db *db, const char *meta_file, const char *base_dir)
     BplusTreeIndex *index      = new BplusTreeIndex();
     string          index_file = table_index_file(base_dir, name(), index_meta->name());
 
-    rc = index->open(this, index_file.c_str(), *index_meta, *field_meta);
+    rc = index->open(this, index_file.c_str(), *index_meta, field_meta);
     if (rc != RC::SUCCESS) {
       delete index;
       LOG_ERROR("Failed to open index. table=%s, index=%s, file=%s, rc=%s",
@@ -471,19 +482,18 @@ RC Table::get_chunk_scanner(ChunkFileScanner &scanner, Trx *trx, ReadWriteMode m
   return rc;
 }
 
-RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_name)
-{
-  if (common::is_blank(index_name) || nullptr == field_meta) {
+RC Table::create_index(Trx *trx, std::vector<const FieldMeta *>& field_meta, const char *index_name) {
+  if (common::is_blank(index_name) || field_meta.empty()) {
     LOG_INFO("Invalid input arguments, table name is %s, index_name is blank or attribute_name is blank", name().c_str());
     return RC::INVALID_ARGUMENT;
   }
 
   IndexMeta new_index_meta;
 
-  RC rc = new_index_meta.init(index_name, *field_meta);
+  RC rc = new_index_meta.init(index_name, field_meta);
   if (rc != RC::SUCCESS) {
-    LOG_INFO("Failed to init IndexMeta in table:%s, index_name:%s, field_name:%s", 
-             name().c_str(), index_name, field_meta->name().c_str());
+    LOG_INFO("Failed to init IndexMeta in table:%s, index_name:%s",
+             name().c_str(), index_name);
     return rc;
   }
 
@@ -491,7 +501,7 @@ RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_
   BplusTreeIndex *index      = new BplusTreeIndex();
   string          index_file = table_index_file(base_dir_.c_str(), name(), index_name);
 
-  rc = index->create(this, index_file.c_str(), new_index_meta, *field_meta);
+  rc = index->create(this, index_file.c_str(), new_index_meta, field_meta);
   if (rc != RC::SUCCESS) {
     delete index;
     LOG_ERROR("Failed to create bplus tree index. file name=%s, rc=%d:%s", index_file.c_str(), rc, strrc(rc));
@@ -502,7 +512,7 @@ RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_
   RecordFileScanner scanner;
   rc = get_record_scanner(scanner, trx, ReadWriteMode::READ_ONLY);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to create scanner while creating index. table=%s, index=%s, rc=%s", 
+    LOG_WARN("failed to create scanner while creating index. table=%s, index=%s, rc=%s",
              name().c_str(), index_name, strrc(rc));
     return rc;
   }
@@ -567,7 +577,9 @@ RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_
 
   LOG_INFO("Successfully added a new index (%s) on the table (%s)", index_name, name().c_str());
   return rc;
+
 }
+
 
 RC Table::delete_record(const RID &rid)
 {
@@ -632,6 +644,7 @@ Index *Table::find_index(const char *index_name) const
 Index *Table::find_index_by_field(const char *field_name) const
 {
   const TableMeta &table_meta = this->table_meta();
+  // TODO:FIX THIS
   const IndexMeta *index_meta = table_meta.find_index_by_field(field_name);
   if (index_meta != nullptr) {
     return this->find_index(index_meta->name());
