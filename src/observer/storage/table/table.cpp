@@ -194,7 +194,7 @@ RC Table::open(Db *db, const char *meta_file, const char *base_dir)
 
   const int index_num = table_meta_.index_num();
   for (int i = 0; i < index_num; i++) {
-    const IndexMeta *index_meta = table_meta_.index(i);
+    const IndexMeta               *index_meta = table_meta_.index(i);
     std::vector<const FieldMeta *> field_meta;
     for (const auto &field_name : index_meta->field()) {
       const FieldMeta *field = table_meta_.field(field_name.c_str());
@@ -241,9 +241,13 @@ RC Table::insert_record(Record &record)
     LOG_ERROR("Insert record failed. table name=%s, rc=%s", table_meta_.name(), strrc(rc));
     return rc;
   }
-
   rc = insert_entry_of_indexes(record.data(), record.rid());
   if (rc != RC::SUCCESS) {  // 可能出现了键值重复
+    if (rc == RC::RECORD_DUPLICATE_KEY_UNIQUE) {
+      record_handler_->delete_record(&record.rid());
+      return rc;
+    }
+
     RC rc2 = delete_entry_of_indexes(record.data(), record.rid(), false /*error_on_not_exists*/);
     if (rc2 != RC::SUCCESS) {
       LOG_ERROR("Failed to rollback index data when insert index entries failed. table name=%s, rc=%d:%s",
@@ -341,6 +345,7 @@ RC Table::recover_insert_record(Record &record)
 
   rc = insert_entry_of_indexes(record.data(), record.rid());
   if (rc != RC::SUCCESS) {  // 可能出现了键值重复
+
     RC rc2 = delete_entry_of_indexes(record.data(), record.rid(), false /*error_on_not_exists*/);
     if (rc2 != RC::SUCCESS) {
       LOG_ERROR("Failed to rollback index data when insert index entries failed. table name=%s, rc=%d:%s",
@@ -377,6 +382,8 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
   auto null_map = reinterpret_cast<int *>(record_data + normal_field_start_index - table_meta_.null_field_num());
 
   for (int i = 0; i < value_num && OB_SUCC(rc); i++) {
+    LOG_INFO("Make record. table name:%s, field name:%s, value:%s",
+             table_meta_.name(), table_meta_.field(i + normal_field_start_index)->name().c_str(), values[i].to_string().c_str());
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
     const Value     &value = values[i];
 
@@ -411,6 +418,7 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
       }
     }
   }
+  LOG_INFO("Make record success. table name:%s", record_data);
 
   if (OB_FAIL(rc)) {
     LOG_WARN("failed to make record. table name:%s", table_meta_.name());
@@ -482,15 +490,16 @@ RC Table::get_chunk_scanner(ChunkFileScanner &scanner, Trx *trx, ReadWriteMode m
   return rc;
 }
 
-RC Table::create_index(Trx *trx, std::vector<const FieldMeta *>& field_meta, const char *index_name) {
+RC Table::create_index(Trx *trx, std::vector<const FieldMeta *> &field_meta, const char *index_name, bool is_unique)
+{
   if (common::is_blank(index_name) || field_meta.empty()) {
     LOG_INFO("Invalid input arguments, table name is %s, index_name is blank or attribute_name is blank", name().c_str());
     return RC::INVALID_ARGUMENT;
   }
 
   IndexMeta new_index_meta;
-
-  RC rc = new_index_meta.init(index_name, field_meta);
+  LOG_INFO("Begin to create index %s on table %s %d", index_name, name().c_str(),is_unique);
+  RC rc = new_index_meta.init(index_name, field_meta, is_unique);
   if (rc != RC::SUCCESS) {
     LOG_INFO("Failed to init IndexMeta in table:%s, index_name:%s",
              name().c_str(), index_name);
@@ -519,6 +528,7 @@ RC Table::create_index(Trx *trx, std::vector<const FieldMeta *>& field_meta, con
 
   Record record;
   while (OB_SUCC(rc = scanner.next(record))) {
+    LOG_INFO("Insert record into index. table name=%s, rid=%s", name().c_str(), record.data());
     rc = index->insert_entry(record.data(), &record.rid());
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to insert record into index while creating index. table=%s, index=%s, rc=%s",
@@ -577,9 +587,7 @@ RC Table::create_index(Trx *trx, std::vector<const FieldMeta *>& field_meta, con
 
   LOG_INFO("Successfully added a new index (%s) on the table (%s)", index_name, name().c_str());
   return rc;
-
 }
-
 
 RC Table::delete_record(const RID &rid)
 {
@@ -611,7 +619,11 @@ RC Table::insert_entry_of_indexes(const char *record, const RID &rid)
   RC rc = RC::SUCCESS;
   for (Index *index : indexes_) {
     rc = index->insert_entry(record, &rid);
+    LOG_INFO("Insert index success. table name=%s, rid=%s rc=%s", name().c_str(), rid.to_string().c_str(),strrc(rc));
     if (rc != RC::SUCCESS) {
+      if (rc == RC::RECORD_DUPLICATE_KEY && index->index_meta().unique()) {
+        rc = RC::RECORD_DUPLICATE_KEY_UNIQUE;
+      }
       break;
     }
   }

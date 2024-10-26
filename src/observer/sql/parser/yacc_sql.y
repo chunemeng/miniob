@@ -135,6 +135,7 @@ UnboundAggregateExpr *create_aggregate_expression(AggrType aggregate_name,
         SYNC
         INSERT
         DELETE
+        UNIQUE
         UPDATE
         LBRACE
         RBRACE
@@ -225,6 +226,7 @@ UnboundAggregateExpr *create_aggregate_expression(AggrType aggregate_name,
 %type <number>              null_t
 %type <string>              relation
 %type <comp>                comp_op
+%type <number>              unique_op
 %type <rel_attr>            rel_attr
 %type <rel_attr_list>       rel_attr_list
 %type <attr_infos>          attr_def_list
@@ -354,17 +356,28 @@ desc_table_stmt:
     }
     ;
 
+unique_op:
+    UNIQUE {
+      $$ = 1;
+    }
+    | /* empty */
+    {
+      $$ = 0;
+    }
+    ;
+
 create_index_stmt:    /*create index 语句的语法解析树*/
-    CREATE INDEX ID ON ID LBRACE rel_list RBRACE
+    CREATE unique_op INDEX ID ON ID LBRACE rel_list RBRACE
     {
       $$ = new ParsedSqlNode(SCF_CREATE_INDEX);
       CreateIndexSqlNode &create_index = $$->create_index;
-      create_index.index_name = $3;
-      create_index.relation_name = $5;
-      create_index.attribute_list = std::move(*$7);
-      free($3);
-      free($5);
-      delete($7);
+      create_index.index_name = $4;
+      create_index.is_unique = $2;
+      create_index.relation_name = $6;
+      create_index.attribute_list = std::move(*$8);
+      free($4);
+      free($6);
+      delete($8);
     }
     ;
 

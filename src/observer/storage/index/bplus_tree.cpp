@@ -869,7 +869,7 @@ RC BplusTreeHandler::create(LogHandler &log_handler, DiskBufferPool &buffer_pool
     return RC::NOMEM;
   }
 
-  key_comparator_.init(attr_type_infos, attr_length, 0);
+  key_comparator_.init(attr_type_infos, attr_length, 0, false);
   key_printer_.init(attr_type_infos, attr_length, 0);
 
   /*
@@ -888,7 +888,8 @@ RC BplusTreeHandler::create(LogHandler &log_handler, DiskBufferPool &buffer_pool
 }
 
 RC BplusTreeHandler::create(LogHandler &log_handler, DiskBufferPool &buffer_pool,
-    std::vector<const FieldMeta *> &field_metas, int null_field_num, int internal_max_size, int leaf_max_size)
+    std::vector<const FieldMeta *> &field_metas, bool is_unique, int null_field_num, int internal_max_size,
+    int leaf_max_size)
 {
 
   std::vector<AttrTypeInfo> attr_type_infos;
@@ -936,6 +937,7 @@ RC BplusTreeHandler::create(LogHandler &log_handler, DiskBufferPool &buffer_pool
   file_header->attr_size         = field_metas.size();
   file_header->attr_length       = attr_length;
   file_header->null_field_num    = null_field_num;
+  file_header->is_unique         = is_unique;
 
   for (int i = 0; i < field_metas.size(); i++) {
     file_header->attr_info[i] = attr_type_infos[i];
@@ -956,7 +958,7 @@ RC BplusTreeHandler::create(LogHandler &log_handler, DiskBufferPool &buffer_pool
     return RC::NOMEM;
   }
 
-  key_comparator_.init(attr_type_infos, attr_length, null_field_num);
+  key_comparator_.init(attr_type_infos, attr_length, null_field_num, is_unique);
   key_printer_.init(attr_type_infos, attr_length, null_field_num);
 
   /*
@@ -1034,7 +1036,7 @@ RC BplusTreeHandler::open(LogHandler &log_handler, DiskBufferPool &buffer_pool)
         file_header_.attr_info[i].type, file_header_.attr_info[i].length, file_header_.attr_info[i].offset);
   }
 
-  key_comparator_.init(attr_type_infos, file_header_.attr_size, file_header_.null_field_num);
+  key_comparator_.init(attr_type_infos, file_header_.attr_size, file_header_.null_field_num, file_header_.is_unique);
   key_printer_.init(attr_type_infos, file_header_.attr_size, file_header_.null_field_num);
   LOG_INFO("Successfully open index");
   return RC::SUCCESS;
@@ -1351,6 +1353,7 @@ RC BplusTreeHandler::insert_entry_into_leaf_node(
   LeafIndexNodeHandler leaf_node(mtr, file_header_, frame);
   bool                 exists          = false;  // 该数据是否已经存在指定的叶子节点中了
   int                  insert_position = leaf_node.lookup(key_comparator_, key, &exists);
+  LOG_INFO("insert position=%d, key=%s, exists=%d", insert_position, key_printer_(key).c_str(), exists);
   if (exists) {
     LOG_TRACE("entry exists");
     return RC::RECORD_DUPLICATE_KEY;
@@ -1532,7 +1535,7 @@ RC BplusTreeHandler::recover_init_header_page(
         file_header_.attr_info[i].type, file_header_.attr_info[i].length, file_header_.attr_info[i].offset);
   }
 
-  key_comparator_.init(attr_type_infos, file_header_.attr_length, file_header_.null_field_num);
+  key_comparator_.init(attr_type_infos, file_header_.attr_length, file_header_.null_field_num, file_header_.is_unique);
   key_printer_.init(attr_type_infos, file_header_.attr_length, file_header_.null_field_num);
 
   return RC::SUCCESS;
@@ -1914,7 +1917,8 @@ RC BplusTreeHandler::delete_entry(const char *user_key, const RID *rid)
   return rc;
 }
 RC BplusTreeHandler::create(LogHandler &log_handler, BufferPoolManager &bpm, const char *file_name,
-    vector<const FieldMeta *> &field_metas, int null_field_num, int internal_max_size, int leaf_max_size)
+    vector<const FieldMeta *> &field_metas, bool is_unique, int null_field_num, int internal_max_size,
+    int leaf_max_size)
 {
   RC rc = bpm.create_file(file_name);
   if (OB_FAIL(rc)) {
@@ -1932,7 +1936,7 @@ RC BplusTreeHandler::create(LogHandler &log_handler, BufferPoolManager &bpm, con
   }
   LOG_INFO("Successfully open index file %s.", file_name);
 
-  rc = this->create(log_handler, *bp, field_metas, null_field_num, internal_max_size, leaf_max_size);
+  rc = this->create(log_handler, *bp, field_metas, is_unique, null_field_num, internal_max_size, leaf_max_size);
   if (OB_FAIL(rc)) {
     bpm.close_file(file_name);
     return rc;

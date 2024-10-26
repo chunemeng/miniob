@@ -19,30 +19,6 @@ See the Mulan PSL v2 for more details. */
 
 BplusTreeIndex::~BplusTreeIndex() noexcept { close(); }
 
-RC BplusTreeIndex::create(Table *table, const char *file_name, const IndexMeta &index_meta, const FieldMeta &field_meta)
-{
-  if (inited_) {
-    LOG_WARN("Failed to create index due to the index has been created before. file_name:%s, index:%s",
-        file_name, index_meta.name());
-    return RC::RECORD_OPENNED;
-  }
-
-  Index::init(index_meta, field_meta);
-
-  BufferPoolManager &bpm = table->db()->buffer_pool_manager();
-  RC rc = index_handler_.create(table->db()->log_handler(), bpm, file_name, field_meta.type(), field_meta.len());
-  if (RC::SUCCESS != rc) {
-    LOG_WARN("Failed to create index_handler, file_name:%s, index:%s, rc:%s",
-        file_name, index_meta.name(), strrc(rc));
-    return rc;
-  }
-
-  inited_ = true;
-  table_  = table;
-  LOG_INFO("Successfully create index, file_name:%s, index:%s",
-    file_name, index_meta.name());
-  return RC::SUCCESS;
-}
 
 RC BplusTreeIndex::open(Table *table, const char *file_name, const IndexMeta &index_meta, const FieldMeta &field_meta)
 {
@@ -128,7 +104,7 @@ RC BplusTreeIndex::create(
 
   BufferPoolManager &bpm = table->db()->buffer_pool_manager();
   RC rc = index_handler_.create(
-      table->db()->log_handler(), bpm, file_name, field_meta, table->table_meta().null_field_num());
+      table->db()->log_handler(), bpm, file_name, field_meta, index_meta.unique(),table->table_meta().null_field_num());
   if (RC::SUCCESS != rc) {
     LOG_WARN("Failed to create index_handler, file_name:%s, index:%s, rc:%s",
         file_name, index_meta.name(), strrc(rc));

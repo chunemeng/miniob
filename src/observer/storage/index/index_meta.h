@@ -35,12 +35,13 @@ class IndexMeta
 public:
   IndexMeta() = default;
 
-  RC init(const char *name, std::vector<const FieldMeta *> &fields);
-  RC init(const char *name, std::vector<std::string> &fields);
+  RC init(const char *name, std::vector<const FieldMeta *> &fields, bool is_unique);
+  RC init(const char *name, std::vector<std::string> &fields, bool is_unique);
 
 public:
-  const char *name() const;
-  const std::vector<std::string > &field() const;
+  const char                     *name() const;
+  const std::vector<std::string> &field() const;
+  bool                            unique() const;
 
   void desc(ostream &os) const;
 
@@ -49,6 +50,7 @@ public:
   static RC from_json(const TableMeta &table, const Json::Value &json_value, IndexMeta &index);
 
 protected:
-  string name_;   // index's name
+  string              name_;   // index's name
   std::vector<string> field_;  // field's name
+  bool                unique_;
 };

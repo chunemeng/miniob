@@ -64,40 +64,47 @@ struct AttrTypeInfo
 class AttrComparator
 {
 public:
-  void init(std::vector<AttrTypeInfo> &infos, int length, int null_num)
+  void init(std::vector<AttrTypeInfo> &infos, int length, int null_num, bool is_unique)
   {
     null_field_num_ = null_num;
     attr_types_.resize(infos.size());
     memcpy(attr_types_.data(), infos.data(), infos.size() * sizeof(AttrTypeInfo));
     attr_length_ = length;
+    is_unique_   = is_unique;
   }
 
   int attr_length() const { return attr_length_; }
 
+  bool is_unique() const { return is_unique_; }
+
   int operator()(const char *v1, const char *v2) const
   {
+    LOG_INFO("AttrComparator::compare v1:%s, v2:%s %d %d", v1, v2, null_field_num_, attr_types_.size());
     // TODO: optimized the comparison
-    auto null_map1 = (uint8_t *)(v1);
-    auto null_map2 = (uint8_t *)(v2);
+    auto null_map1 = (int32_t *)(v1);
+    auto null_map2 = (int32_t *)(v2);
 
     for (int i = null_field_num_; i < attr_types_.size(); i++) {
       Value left;
       int   field_id = attr_types_[i].field_id;
-      if (null_map1[field_id / 8] & (1 << (field_id % 8))) {
+      if (null_map1[field_id / 32] & (1 << (field_id % 32))) {
         left.set_null();
       } else {
         left.set_type(attr_types_[i].type);
         left.set_data(v1 + attr_types_[i].offset, attr_types_[i].length);
       }
       Value right;
-      if (null_map2[field_id / 8] & (1 << (field_id % 8))) {
+      if (null_map2[field_id / 32] & (1 << (field_id % 32))) {
         right.set_null();
       } else {
         right.set_type(attr_types_[i].type);
         right.set_data(v2 + attr_types_[i].offset, attr_types_[i].length);
       }
 
+      LOG_INFO("AttrComparator::compare left:%s, right:%s", left.to_string().c_str(), right.to_string().c_str());
+
       int result = DataType::type_instance(attr_types_[i].type)->compare(left, right);
+
       if (result != 0) {
         return result;
       }
@@ -108,6 +115,7 @@ public:
 private:
   std::vector<AttrTypeInfo> attr_types_;
   int                       attr_length_;
+  bool                      is_unique_ = false;
   int                       null_field_num_;
 };
 
@@ -119,9 +127,9 @@ private:
 class KeyComparator
 {
 public:
-  void init(std::vector<AttrTypeInfo> &infos, int length, int null_num)
+  void init(std::vector<AttrTypeInfo> &infos, int length, int null_num, bool is_unique)
   {
-    attr_comparator_.init(infos, length, null_num);
+    attr_comparator_.init(infos, length, null_num, is_unique);
   }
 
   const AttrComparator &attr_comparator() const { return attr_comparator_; }
@@ -131,6 +139,10 @@ public:
     int result = attr_comparator_(v1, v2);
     if (result != 0) {
       return result;
+    }
+
+    if (attr_comparator_.is_unique()) {
+      return 0;
     }
 
     const RID *rid1 = (const RID *)(v1 + attr_comparator_.attr_length());
@@ -232,6 +244,7 @@ struct IndexFileHeader
   int32_t null_field_num;     ///< null field number
   int32_t attr_length;        ///< attr length
   int32_t attr_size;          ///< attr size
+  bool    is_unique;          ///< 是否唯一索引
   // NOTE: 32 IS MAX SUPPORT FOR ONE NULL FIELD
   AttrTypeInfo attr_info[32];
 
@@ -528,9 +541,9 @@ public:
   RC create(LogHandler &log_handler, DiskBufferPool &buffer_pool, AttrType attr_type, int attr_length,
       int internal_max_size = -1, int leaf_max_size = -1);
   RC create(LogHandler &log_handler, BufferPoolManager &bpm, const char *file_name,
-      std::vector<const FieldMeta *> &field_metas, int null_field_num, int internal_max_size = -1,
+      std::vector<const FieldMeta *> &field_metas, bool is_unique, int null_field_num, int internal_max_size = -1,
       int leaf_max_size = -1);
-  RC create(LogHandler &log_handler, DiskBufferPool &bpm, std::vector<const FieldMeta *> &field_metas,
+  RC create(LogHandler &log_handler, DiskBufferPool &bpm, std::vector<const FieldMeta *> &field_metas, bool is_unique,
       int null_field_num, int internal_max_size = -1, int leaf_max_size = -1);
 
   /**

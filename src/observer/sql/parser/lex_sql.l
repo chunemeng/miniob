@@ -125,6 +125,7 @@ INFILE                                  RETURN_TOKEN(INFILE);
 EXPLAIN                                 RETURN_TOKEN(EXPLAIN);
 GROUP                                   RETURN_TOKEN(GROUP);
 BY                                      RETURN_TOKEN(BY);
+UNIQUE                                  RETURN_TOKEN(UNIQUE);
 STORAGE                                 RETURN_TOKEN(STORAGE);
 NULLABLE                                RETURN_TOKEN(NULL_L);
 NULL                                    RETURN_TOKEN(NULL_T);
