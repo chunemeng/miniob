@@ -9,18 +9,21 @@
 class UpdateLogicalOperator : public LogicalOperator
 {
 public:
-  UpdateLogicalOperator(Table *table, const FieldMeta *field_meta, Expression* expression);
+  UpdateLogicalOperator(
+      Table *table, std::vector<const FieldMeta *> &field_meta, std::vector<std::unique_ptr<Expression>> &expression)
+      : table_(table), value_(std::move(expression)), field_meta_(std::move(field_meta))
+  {}
   virtual ~UpdateLogicalOperator() = default;
 
-  LogicalOperatorType          type() const override { return LogicalOperatorType::UPDATE; }
-  Table                       *table() const { return table_; }
-  const FieldMeta             *field_meta() const { return field_meta_; }
-  std::unique_ptr<Expression> &values() { return value_; }
+  LogicalOperatorType                       type() const override { return LogicalOperatorType::UPDATE; }
+  Table                                    *table() const { return table_; }
+  std::vector<const FieldMeta *>           &field_meta() { return field_meta_; }
+  std::vector<std::unique_ptr<Expression>> &values() { return value_; }
 
 private:
   Table *table_ = nullptr;
 
-  std::unique_ptr<Expression> value_;
+  std::vector<std::unique_ptr<Expression>> value_;
 
-  const FieldMeta *field_meta_;
+  std::vector<const FieldMeta *> field_meta_;
 };

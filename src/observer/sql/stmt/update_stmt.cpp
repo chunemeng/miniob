@@ -21,8 +21,9 @@ See the Mulan PSL v2 for more details. */
 #include "storage/table/table.h"
 #include "sql/parser/expression_binder.h"
 
-UpdateStmt::UpdateStmt(Table *table, Expression *value, const FieldMeta *field_meta, FilterStmt *filter_stmt)
-    : table_(table), value_(value), field_meta_(field_meta), filter_stmt_(filter_stmt)
+UpdateStmt::UpdateStmt(Table *table, std::vector<std::unique_ptr<Expression>> &value,
+    std::vector<const FieldMeta *> &field_meta, FilterStmt *filter_stmt)
+    : table_(table), filter_stmt_(filter_stmt), field_meta_(std::move(field_meta)), values_(std::move(value))
 {}
 
 UpdateStmt::~UpdateStmt()
@@ -52,28 +53,46 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
-  ExpressionBinder                         binder(binder_context);
-  std::vector<std::unique_ptr<Expression>> exprs;
-  std::unique_ptr<Expression>              expr(update.value);
-  RC                                       rc = binder.bind_expression(expr, exprs);
-  if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to bind expression. rc=%d:%s", rc, strrc(rc));
-    return rc;
+  ExpressionBinder binder(binder_context);
+  const auto      &table_meta = table->table_meta();
+  auto            &exprs      = update.expressions;
+
+  std::vector<std::unique_ptr<Expression>> expr;
+  expr.reserve(exprs.size());
+  std::vector<const FieldMeta *> fields;
+  fields.reserve(exprs.size());
+
+  RC rc = RC::SUCCESS;
+
+  LOG_INFO("update expr size: %d", exprs.size());
+  for (int i = 0; i < exprs.size(); ++i) {
+    LOG_INFO("update expr type: %d", exprs[i]->type());
+    if (exprs[i]->type() != ExprType::COMPARISON) {
+      LOG_WARN("invalid update expr type.");
+      return RC::INVALID_ARGUMENT;
+    }
+    auto expr_tmp = dynamic_cast<ComparisonExpr *>(exprs[i].get());
+    if (expr_tmp->left()->type() != ExprType::UNBOUND_FIELD) {
+      LOG_WARN("invalid update expr op.");
+      return RC::INVALID_ARGUMENT;
+    }
+    const FieldMeta *field_meta =
+        table_meta.field(dynamic_cast<UnboundFieldExpr *>(expr_tmp->left().get())->field_name());
+    if (nullptr == field_meta) {
+      LOG_WARN("no such field in table. db=%s, table=%s",
+          db->name(), table_name.c_str());
+      return RC::SCHEMA_FIELD_NOT_EXIST;
+    }
+    fields.emplace_back(field_meta);
+
+    rc = binder.bind_expression(expr_tmp->right(), expr);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to bind expression. rc=%d:%s", rc, strrc(rc));
+      return rc;
+    }
   }
 
-  if (exprs.size() != 1) {
-    LOG_WARN("invalid expression. exprs.size=%d", static_cast<int>(exprs.size()));
-    return RC::INVALID_ARGUMENT;
-  }
-
-  // check the fields number
-
-  const FieldMeta *field_meta = table->table_meta().field(update.attribute_name.c_str());
-  if (nullptr == field_meta) {
-    LOG_WARN("no such field in table. db=%s, table=%s, field name=%s",
-             db->name(), table_name.c_str(), update.attribute_name.c_str());
-    return RC::SCHEMA_FIELD_NOT_EXIST;
-  }
+  ASSERT(expr.size() == fields.size(), "expr size should be equal to fields size");
 
   FilterStmt *filter_stmt = nullptr;
   rc = FilterStmt::create(table, update.conditions.data(), static_cast<int>(update.conditions.size()), filter_stmt);
@@ -83,7 +102,7 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
   }
 
   // everything alright
-  stmt = new UpdateStmt(table, exprs[0].release(), field_meta, filter_stmt);
+  stmt = new UpdateStmt(table, expr, fields, filter_stmt);
 
   return rc;
 }

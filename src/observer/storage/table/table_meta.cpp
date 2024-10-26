@@ -127,8 +127,8 @@ RC TableMeta::add_index(const IndexMeta &index)
   return RC::SUCCESS;
 }
 
-const char *TableMeta::name() const { return name_.c_str(); }
-const std::string& TableMeta::name_str() const { return name_; }
+const char        *TableMeta::name() const { return name_.c_str(); }
+const std::string &TableMeta::name_str() const { return name_; }
 
 const FieldMeta *TableMeta::trx_field() const { return &fields_[0]; }
 
@@ -346,4 +346,13 @@ void TableMeta::desc(std::ostream &os) const
     os << std::endl;
   }
   os << ')' << std::endl;
+}
+const FieldMeta *TableMeta::field(const string &name) const
+{
+  for (const FieldMeta &field : fields_) {
+    if (field.name() == name) {
+      return &field;
+    }
+  }
+  return nullptr;
 }

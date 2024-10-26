@@ -28,23 +28,24 @@ class UpdateStmt : public Stmt
 {
 public:
   ~UpdateStmt() override;
-  UpdateStmt(Table *table, Expression* value, const FieldMeta *field_meta, FilterStmt *filter_stmt);
+  UpdateStmt(Table *table, std::vector<std::unique_ptr<Expression>> &value, std::vector<const FieldMeta *> &,
+      FilterStmt *filter_stmt);
 
 public:
   static RC create(Db *db, const UpdateSqlNode &update_sql, Stmt *&stmt);
 
 public:
-  Table           *table() const { return table_; }
-  Expression      *value() const { return value_; }
-  FilterStmt      *filter_stmt() const { return filter_stmt_; }
-  const FieldMeta *field_meta() const { return field_meta_; }
+  Table                                    *table() const { return table_; }
+  std::vector<std::unique_ptr<Expression>> &values() { return values_; }
+  FilterStmt                               *filter_stmt() const { return filter_stmt_; }
+  std::vector<const FieldMeta *>           &field_meta() { return field_meta_; }
 
   StmtType type() const override { return StmtType::UPDATE; }
 
 private:
-  Table      *table_ = nullptr;
-  Expression *value_ = nullptr;
+  Table      *table_       = nullptr;
+  FilterStmt *filter_stmt_ = nullptr;
 
-  const FieldMeta *field_meta_  = nullptr;
-  FilterStmt      *filter_stmt_ = nullptr;
+  std::vector<const FieldMeta *>           field_meta_;
+  std::vector<std::unique_ptr<Expression>> values_;
 };

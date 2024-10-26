@@ -36,15 +36,18 @@ RC UpdatePhysicalOperator::open(Trx *trx)
 
   rc = RC::SUCCESS;
 
-  Value value;
-  rc = values_->try_get_value(value);
-  if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to get value: %s", strrc(rc));
-    return rc;
+  std::vector<Value> values(field_meta_.size());
+
+  for (int i = 0; i < field_meta_.size(); ++i) {
+    rc = value_[i]->try_get_value(values[i]);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to evaluate expression: %s", strrc(rc));
+      return rc;
+    }
   }
 
   for (Record &record : records_) {
-    rc = table_->update_record(record, field_meta_, value);
+    rc = table_->update_record(record, field_meta_, values);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to update record: %s", strrc(rc));
       return rc;

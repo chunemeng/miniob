@@ -88,6 +88,9 @@ public:
 
   RC update_record(Record &old_record, const FieldMeta *field_meta, Value &value);
 
+  RC update_record(Record &old_record, std::vector<const FieldMeta*>& field_meta, std::vector<Value> &value);
+
+
   RC recover_insert_record(Record &record);
 
 

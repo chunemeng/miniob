@@ -183,7 +183,7 @@ int LogicalPlanGenerator::implicit_cast_cost(AttrType from, AttrType to)
 
 RC LogicalPlanGenerator::create_plan(InsertStmt *insert_stmt, unique_ptr<LogicalOperator> &logical_operator)
 {
-  Table        *table = insert_stmt->table();
+  Table *table = insert_stmt->table();
 
   InsertLogicalOperator *insert_operator = new InsertLogicalOperator(table, insert_stmt->values());
   logical_operator.reset(insert_operator);
@@ -230,7 +230,7 @@ RC LogicalPlanGenerator::create_plan(UpdateStmt *update_stmt, unique_ptr<Logical
   }
 
   unique_ptr<LogicalOperator> update_oper(
-      new UpdateLogicalOperator(table, update_stmt->field_meta(), update_stmt->value()));
+      new UpdateLogicalOperator(table, update_stmt->field_meta(), update_stmt->values()));
 
   if (predicate_oper) {
     predicate_oper->add_child(std::move(table_get_oper));

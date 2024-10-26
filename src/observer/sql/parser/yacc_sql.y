@@ -224,6 +224,8 @@ UnboundAggregateExpr *create_aggregate_expression(AggrType aggregate_name,
 %type <value>               value
 %type <number>              number
 %type <number>              unique_op
+%type <expression>          eq_expr
+%type <expression_list>     assign_list
 %type <number>              null_t
 %type <string>              relation
 %type <comp>                comp_op
@@ -268,6 +270,7 @@ UnboundAggregateExpr *create_aggregate_expression(AggrType aggregate_name,
 %left '+' '-'
 %left '*' '/'
 %nonassoc UMINUS
+%nonassoc  ASSIGN
 %%
 
 commands: command_wrapper opt_semicolon  //commands or sqls. parser starts here.
@@ -600,19 +603,17 @@ delete_stmt:    /*  delete 语句的语法解析树*/
     }
     ;
 update_stmt:      /*  update 语句的语法解析树*/
-    UPDATE ID SET ID EQ expression where
+    UPDATE ID SET assign_list where
     {
       $$ = new ParsedSqlNode(SCF_UPDATE);
       $$->update.relation_name = $2;
-      $$->update.attribute_name = $4;
-      $$->update.value = $6;
-      if ($7 != nullptr) {
-        $$->update.conditions.swap(*$7);
-        delete $7;
+      $$->update.expressions = std::move(*$4);
+      if ($5 != nullptr) {
+        $$->update.conditions.swap(*$5);
+        delete $5;
       }
-      $6 = nullptr;
+      delete $4;
       free($2);
-      free($4);
     }
     ;
 select_stmt:        /*  select 语句的语法解析树*/
@@ -654,14 +655,8 @@ calc_stmt:
       delete $2;
     }
     ;
-
-expression_list:
-    expression
-    {
-      $$ = new std::vector<std::unique_ptr<Expression>>;
-      $$->emplace_back($1);
-    }
-    | expression COMMA expression_list
+    assign_list:
+    eq_expr COMMA assign_list
     {
       if ($3 != nullptr) {
         $$ = $3;
@@ -669,6 +664,28 @@ expression_list:
         $$ = new std::vector<std::unique_ptr<Expression>>;
       }
       $$->emplace($$->begin(), $1);
+    }
+    | eq_expr
+    {
+      $$ = new std::vector<std::unique_ptr<Expression>>;
+      $$->emplace_back($1);
+    }
+    ;
+
+expression_list:
+    expression COMMA expression_list
+    {
+      if ($3 != nullptr) {
+        $$ = $3;
+      } else {
+        $$ = new std::vector<std::unique_ptr<Expression>>;
+      }
+      $$->emplace($$->begin(), $1);
+    }
+    | expression
+    {
+      $$ = new std::vector<std::unique_ptr<Expression>>;
+      $$->emplace_back($1);
     }
     ;
 expression:
@@ -694,6 +711,7 @@ expression:
     | INNER_PRODUCT LBRACE expression COMMA expression RBRACE {
       $$ = create_arithmetic_expression(ArithmeticExpr::Type::INNER_PRODUCT, $3, $5, sql_string, &@$);
     }
+
     | LBRACE expression RBRACE {
       $$ = $2;
       $$->set_name(token_name(sql_string, &@$));
@@ -874,6 +892,13 @@ condition_list:
       delete $1;
     }
     ;
+eq_expr:
+    expression EQ expression
+    {
+      $$ = create_comparison_expression(EQUAL_TO, $1, $3, sql_string, &@$);
+    }
+    ;
+
 condition:
     expression comp_op expression
     {
@@ -890,11 +915,15 @@ condition:
       $$ = new ConditionSqlNode;
       $$->condition = create_comparison_expression(NOT_EXISTS, $3, nullptr, sql_string, &@$);
     }
+    | eq_expr
+    {
+      $$ = new ConditionSqlNode;
+      $$->condition = $1;
+    }
     ;
 
 comp_op:
-      EQ { $$ = EQUAL_TO; }
-    | LT { $$ = LESS_THAN; }
+    LT { $$ = LESS_THAN; }
     | GT { $$ = GREAT_THAN; }
     | LE { $$ = LESS_EQUAL; }
     | GE { $$ = GREAT_EQUAL; }
