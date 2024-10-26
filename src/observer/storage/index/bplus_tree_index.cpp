@@ -115,8 +115,8 @@ IndexScanner *BplusTreeIndex::create_scanner(
 }
 
 RC BplusTreeIndex::sync() { return index_handler_.sync(); }
-RC BplusTreeIndex::create(
-    Table *table, const char *file_name, const IndexMeta &index_meta, std::vector<const FieldMeta *> &field_meta)
+RC BplusTreeIndex::create(Table *table, bool is_unique, const char *file_name, const IndexMeta &index_meta,
+    std::vector<const FieldMeta *> &field_meta)
 {
   if (inited_) {
     LOG_WARN("Failed to create index due to the index has been created before. file_name:%s, index:%s",
@@ -127,8 +127,8 @@ RC BplusTreeIndex::create(
   Index::init(index_meta, field_meta);
 
   BufferPoolManager &bpm = table->db()->buffer_pool_manager();
-  RC rc = index_handler_.create(
-      table->db()->log_handler(), bpm, file_name, field_meta, table->table_meta().null_field_num());
+  RC                 rc  = index_handler_.create(
+      table->db()->log_handler(), is_unique, bpm, file_name, field_meta, table->table_meta().null_field_num());
   if (RC::SUCCESS != rc) {
     LOG_WARN("Failed to create index_handler, file_name:%s, index:%s, rc:%s",
         file_name, index_meta.name(), strrc(rc));

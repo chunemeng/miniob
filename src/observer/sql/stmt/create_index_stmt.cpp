@@ -49,6 +49,9 @@ RC CreateIndexStmt::create(Db *db, const CreateIndexSqlNode &create_index, Stmt 
   auto                           table_meta = table->table_meta();
   // NOTE:SHOULD reserve one more space for the NULL FIELD
   index_fields.reserve(create_index.attribute_list.size() + table_meta.null_field_num());
+  for (int i = 0; i < table_meta.null_field_num(); ++i) {
+    index_fields.push_back(table_meta.field(i));
+  }
 
   for (const auto &attr : create_index.attribute_list) {
     const FieldMeta *field_meta = table->table_meta().field(attr.c_str());
@@ -59,6 +62,6 @@ RC CreateIndexStmt::create(Db *db, const CreateIndexSqlNode &create_index, Stmt 
     index_fields.push_back(field_meta);
   }
 
-  stmt = new CreateIndexStmt(table, std::move(index_fields), create_index.index_name);
+  stmt = new CreateIndexStmt(table, std::move(index_fields), create_index.index_name, create_index.unique);
   return RC::SUCCESS;
 }

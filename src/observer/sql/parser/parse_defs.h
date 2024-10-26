@@ -209,6 +209,7 @@ struct CreateIndexSqlNode
   std::string              index_name;      ///< Index name
   std::string              relation_name;   ///< Relation name
   std::vector<std::string> attribute_list;  ///< Attribute name
+  bool                     unique = false;  ///< 是否是唯一索引
 };
 
 /**

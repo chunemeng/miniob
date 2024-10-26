@@ -854,6 +854,7 @@ RC BplusTreeHandler::create(LogHandler &log_handler, DiskBufferPool &buffer_pool
   file_header->leaf_max_size     = leaf_max_size;
   file_header->root_page         = BP_INVALID_PAGE_NUM;
   file_header->attr_size         = 1;
+  file_header->attr_length       = attr_length;
   // 取消记录日志的原因请参考下面的sync调用的地方。
   // mtr.logger().init_header_page(header_frame, *file_header);
 
@@ -869,7 +870,7 @@ RC BplusTreeHandler::create(LogHandler &log_handler, DiskBufferPool &buffer_pool
     return RC::NOMEM;
   }
 
-  key_comparator_.init(attr_type_infos, attr_length, 0);
+  key_comparator_.init(attr_type_infos, attr_length, 0, false);
   key_printer_.init(attr_type_infos, attr_length, 0);
 
   /*
@@ -887,7 +888,7 @@ RC BplusTreeHandler::create(LogHandler &log_handler, DiskBufferPool &buffer_pool
   return RC::SUCCESS;
 }
 
-RC BplusTreeHandler::create(LogHandler &log_handler, DiskBufferPool &buffer_pool,
+RC BplusTreeHandler::create(LogHandler &log_handler, bool is_unique, DiskBufferPool &buffer_pool,
     std::vector<const FieldMeta *> &field_metas, int null_field_num, int internal_max_size, int leaf_max_size)
 {
 
@@ -936,6 +937,7 @@ RC BplusTreeHandler::create(LogHandler &log_handler, DiskBufferPool &buffer_pool
   file_header->attr_size         = field_metas.size();
   file_header->attr_length       = attr_length;
   file_header->null_field_num    = null_field_num;
+  file_header->is_unique         = is_unique;
 
   for (int i = 0; i < field_metas.size(); i++) {
     file_header->attr_info[i] = attr_type_infos[i];
@@ -956,7 +958,7 @@ RC BplusTreeHandler::create(LogHandler &log_handler, DiskBufferPool &buffer_pool
     return RC::NOMEM;
   }
 
-  key_comparator_.init(attr_type_infos, attr_length, null_field_num);
+  key_comparator_.init(attr_type_infos, attr_length, null_field_num, is_unique);
   key_printer_.init(attr_type_infos, attr_length, null_field_num);
 
   /*
@@ -1034,7 +1036,7 @@ RC BplusTreeHandler::open(LogHandler &log_handler, DiskBufferPool &buffer_pool)
         file_header_.attr_info[i].type, file_header_.attr_info[i].length, file_header_.attr_info[i].offset);
   }
 
-  key_comparator_.init(attr_type_infos, file_header_.attr_size, file_header_.null_field_num);
+  key_comparator_.init(attr_type_infos, file_header_.attr_size, file_header_.null_field_num, file_header_.is_unique);
   key_printer_.init(attr_type_infos, file_header_.attr_size, file_header_.null_field_num);
   LOG_INFO("Successfully open index");
   return RC::SUCCESS;
@@ -1532,7 +1534,7 @@ RC BplusTreeHandler::recover_init_header_page(
         file_header_.attr_info[i].type, file_header_.attr_info[i].length, file_header_.attr_info[i].offset);
   }
 
-  key_comparator_.init(attr_type_infos, file_header_.attr_length, file_header_.null_field_num);
+  key_comparator_.init(attr_type_infos, file_header_.attr_length, file_header_.null_field_num, file_header_.is_unique);
   key_printer_.init(attr_type_infos, file_header_.attr_length, file_header_.null_field_num);
 
   return RC::SUCCESS;
@@ -1913,7 +1915,7 @@ RC BplusTreeHandler::delete_entry(const char *user_key, const RID *rid)
   rc = delete_entry_internal(mtr, leaf_frame, key);
   return rc;
 }
-RC BplusTreeHandler::create(LogHandler &log_handler, BufferPoolManager &bpm, const char *file_name,
+RC BplusTreeHandler::create(LogHandler &log_handler, bool is_unique, BufferPoolManager &bpm, const char *file_name,
     vector<const FieldMeta *> &field_metas, int null_field_num, int internal_max_size, int leaf_max_size)
 {
   RC rc = bpm.create_file(file_name);
@@ -1932,7 +1934,7 @@ RC BplusTreeHandler::create(LogHandler &log_handler, BufferPoolManager &bpm, con
   }
   LOG_INFO("Successfully open index file %s.", file_name);
 
-  rc = this->create(log_handler, *bp, field_metas, null_field_num, internal_max_size, leaf_max_size);
+  rc = this->create(log_handler, is_unique, *bp, field_metas, null_field_num, internal_max_size, leaf_max_size);
   if (OB_FAIL(rc)) {
     bpm.close_file(file_name);
     return rc;

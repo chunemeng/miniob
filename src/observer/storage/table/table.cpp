@@ -194,7 +194,7 @@ RC Table::open(Db *db, const char *meta_file, const char *base_dir)
 
   const int index_num = table_meta_.index_num();
   for (int i = 0; i < index_num; i++) {
-    const IndexMeta *index_meta = table_meta_.index(i);
+    const IndexMeta               *index_meta = table_meta_.index(i);
     std::vector<const FieldMeta *> field_meta;
     for (const auto &field_name : index_meta->field()) {
       const FieldMeta *field = table_meta_.field(field_name.c_str());
@@ -244,6 +244,11 @@ RC Table::insert_record(Record &record)
 
   rc = insert_entry_of_indexes(record.data(), record.rid());
   if (rc != RC::SUCCESS) {  // 可能出现了键值重复
+    if (rc == RC::RECORD_DUPLICATE_KEY_UNIQUE) {
+      record_handler_->delete_record(&record.rid());
+      return rc;
+    }
+
     RC rc2 = delete_entry_of_indexes(record.data(), record.rid(), false /*error_on_not_exists*/);
     if (rc2 != RC::SUCCESS) {
       LOG_ERROR("Failed to rollback index data when insert index entries failed. table name=%s, rc=%d:%s",
@@ -482,7 +487,8 @@ RC Table::get_chunk_scanner(ChunkFileScanner &scanner, Trx *trx, ReadWriteMode m
   return rc;
 }
 
-RC Table::create_index(Trx *trx, std::vector<const FieldMeta *>& field_meta, const char *index_name) {
+RC Table::create_index(Trx *trx, std::vector<const FieldMeta *> &field_meta, const char *index_name, bool is_unique)
+{
   if (common::is_blank(index_name) || field_meta.empty()) {
     LOG_INFO("Invalid input arguments, table name is %s, index_name is blank or attribute_name is blank", name().c_str());
     return RC::INVALID_ARGUMENT;
@@ -490,7 +496,7 @@ RC Table::create_index(Trx *trx, std::vector<const FieldMeta *>& field_meta, con
 
   IndexMeta new_index_meta;
 
-  RC rc = new_index_meta.init(index_name, field_meta);
+  RC rc = new_index_meta.init(index_name, field_meta, is_unique);
   if (rc != RC::SUCCESS) {
     LOG_INFO("Failed to init IndexMeta in table:%s, index_name:%s",
              name().c_str(), index_name);
@@ -577,9 +583,7 @@ RC Table::create_index(Trx *trx, std::vector<const FieldMeta *>& field_meta, con
 
   LOG_INFO("Successfully added a new index (%s) on the table (%s)", index_name, name().c_str());
   return rc;
-
 }
-
 
 RC Table::delete_record(const RID &rid)
 {
@@ -612,6 +616,9 @@ RC Table::insert_entry_of_indexes(const char *record, const RID &rid)
   for (Index *index : indexes_) {
     rc = index->insert_entry(record, &rid);
     if (rc != RC::SUCCESS) {
+      if (rc == RC::RECORD_DUPLICATE_KEY && index->index_meta().is_unique()) {
+        rc = RC::RECORD_DUPLICATE_KEY_UNIQUE;
+      }
       break;
     }
   }

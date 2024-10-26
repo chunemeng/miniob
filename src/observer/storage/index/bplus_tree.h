@@ -119,9 +119,10 @@ private:
 class KeyComparator
 {
 public:
-  void init(std::vector<AttrTypeInfo> &infos, int length, int null_num)
+  void init(std::vector<AttrTypeInfo> &infos, int length, int null_num, bool is_unique)
   {
     attr_comparator_.init(infos, length, null_num);
+    is_unique_ = is_unique;
   }
 
   const AttrComparator &attr_comparator() const { return attr_comparator_; }
@@ -132,6 +133,9 @@ public:
     if (result != 0) {
       return result;
     }
+    if (is_unique_) {
+      return 0;
+    }
 
     const RID *rid1 = (const RID *)(v1 + attr_comparator_.attr_length());
     const RID *rid2 = (const RID *)(v2 + attr_comparator_.attr_length());
@@ -140,6 +144,7 @@ public:
 
 private:
   AttrComparator attr_comparator_;
+  bool           is_unique_;
 };
 
 /**
@@ -232,6 +237,7 @@ struct IndexFileHeader
   int32_t null_field_num;     ///< null field number
   int32_t attr_length;        ///< attr length
   int32_t attr_size;          ///< attr size
+  bool    is_unique;          ///< 是否唯一索引
   // NOTE: 32 IS MAX SUPPORT FOR ONE NULL FIELD
   AttrTypeInfo attr_info[32];
 
@@ -527,10 +533,10 @@ public:
       int internal_max_size = -1, int leaf_max_size = -1);
   RC create(LogHandler &log_handler, DiskBufferPool &buffer_pool, AttrType attr_type, int attr_length,
       int internal_max_size = -1, int leaf_max_size = -1);
-  RC create(LogHandler &log_handler, BufferPoolManager &bpm, const char *file_name,
+  RC create(LogHandler &log_handler, bool is_unqiue, BufferPoolManager &bpm, const char *file_name,
       std::vector<const FieldMeta *> &field_metas, int null_field_num, int internal_max_size = -1,
       int leaf_max_size = -1);
-  RC create(LogHandler &log_handler, DiskBufferPool &bpm, std::vector<const FieldMeta *> &field_metas,
+  RC create(LogHandler &log_handler, bool is_unqiue, DiskBufferPool &bpm, std::vector<const FieldMeta *> &field_metas,
       int null_field_num, int internal_max_size = -1, int leaf_max_size = -1);
 
   /**

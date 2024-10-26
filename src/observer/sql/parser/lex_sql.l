@@ -128,6 +128,7 @@ BY                                      RETURN_TOKEN(BY);
 STORAGE                                 RETURN_TOKEN(STORAGE);
 NULLABLE                                RETURN_TOKEN(NULL_L);
 NULL                                    RETURN_TOKEN(NULL_T);
+UNIQUE                                RETURN_TOKEN(UNIQUE);
 MAX                                     RETURN_TOKEN(MAX);
 MIN                                     RETURN_TOKEN(MIN);
 L2_DISTANCE                             RETURN_TOKEN(L2_DIST);
