@@ -39,7 +39,6 @@ See the Mulan PSL v2 for more details. */
   DEFINE_RC(RECORD_INVALID_KEY)          \
   DEFINE_RC(RECORD_DUPLICATE_KEY_UNIQUE) \
   DEFINE_RC(RECORD_DUPLICATE_KEY)        \
-  DEFINE_RC(RECORD_DUPLICATE_KEY_UNIQUE) \
   DEFINE_RC(RECORD_NOMEM)                \
   DEFINE_RC(RECORD_EOF)                  \
   DEFINE_RC(RECORD_NOT_EXIST)            \
