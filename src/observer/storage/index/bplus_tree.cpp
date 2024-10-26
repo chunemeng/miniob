@@ -896,10 +896,10 @@ RC BplusTreeHandler::create(LogHandler &log_handler, bool is_unique, DiskBufferP
 
   for (const FieldMeta *field_meta : field_metas) {
     int len = field_meta->len();
-    attr_type_infos.emplace_back(field_meta->type(), len, field_meta->offset());
+    attr_type_infos.emplace_back(field_meta->type(), len, field_meta->offset(), field_meta->field_id());
   }
-  auto & attr_type_info = field_metas[field_metas.size() - 1];
-  int attr_length = attr_type_info->len() + attr_type_info->offset();
+  auto &attr_type_info = field_metas[field_metas.size() - 1];
+  int   attr_length    = attr_type_info->len() + attr_type_info->offset();
 
   if (internal_max_size < 0) {
     internal_max_size = calc_internal_page_capacity(attr_length);

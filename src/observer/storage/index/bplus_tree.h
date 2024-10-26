@@ -77,20 +77,19 @@ public:
   int operator()(const char *v1, const char *v2) const
   {
     // TODO: optimized the comparison
-    auto null_map1 = (uint8_t *)(v1);
-    auto null_map2 = (uint8_t *)(v2);
-
+    auto null_map1 = (int32_t *)(v1);
+    auto null_map2 = (int32_t *)(v2);
     for (int i = null_field_num_; i < attr_types_.size(); i++) {
       Value left;
       int   field_id = attr_types_[i].field_id;
-      if (null_map1[field_id / 8] & (1 << (field_id % 8))) {
+      if (null_map1[field_id / 32] & (1 << (field_id % 32))) {
         left.set_null();
       } else {
         left.set_type(attr_types_[i].type);
         left.set_data(v1 + attr_types_[i].offset, attr_types_[i].length);
       }
       Value right;
-      if (null_map2[field_id / 8] & (1 << (field_id % 8))) {
+      if (null_map2[field_id / 32] & (1 << (field_id % 32))) {
         right.set_null();
       } else {
         right.set_type(attr_types_[i].type);
