@@ -503,10 +503,6 @@ RC Table::create_index(Trx *trx, std::vector<const FieldMeta *> &field_meta, con
     return rc;
   }
 
-  if (strcmp(index_name, "index_id2") == 0) {
-    ASSERT(false, "index_id2 is reserved for primary key");
-  }
-
   // 创建索引相关数据
   BplusTreeIndex *index      = new BplusTreeIndex();
   string          index_file = table_index_file(base_dir_.c_str(), name(), index_name);

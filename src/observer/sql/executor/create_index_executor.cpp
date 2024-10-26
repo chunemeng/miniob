@@ -30,6 +30,10 @@ RC CreateIndexExecutor::execute(SQLStageEvent *sql_event)
 
   CreateIndexStmt *create_index_stmt = static_cast<CreateIndexStmt *>(stmt);
 
+  if (strcmp(create_index_stmt->index_name().c_str(), "index_id2") == 0) {
+    ASSERT(false, "index_id2 is reserved for primary key");
+  }
+
   Trx   *trx   = session->current_trx();
   Table *table = create_index_stmt->table();
   return table->create_index(
