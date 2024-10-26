@@ -526,7 +526,7 @@ RC Table::create_index(Trx *trx, std::vector<const FieldMeta *> &field_meta, con
   Record record;
   while (OB_SUCC(rc = scanner.next(record))) {
     rc = index->insert_entry(record.data(), &record.rid());
-    if (rc != RC::SUCCESS) {
+    if (rc != RC::SUCCESS && rc != RC::RECORD_DUPLICATE_KEY) {
       LOG_WARN("failed to insert record into index while creating index. table=%s, index=%s, rc=%s",
                name().c_str(), index_name, strrc(rc));
       return rc;
