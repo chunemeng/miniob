@@ -97,6 +97,8 @@ public:
         right.set_data(v2 + attr_types_[i].offset, attr_types_[i].length);
       }
 
+      LOG_INFO("left:%s, right:%s", left.to_string().c_str(), right.to_string().c_str());
+
       if (right.attr_type() == AttrType::NULLS) {
         return 1;
       }
