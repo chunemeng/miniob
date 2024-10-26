@@ -25,15 +25,17 @@ RC CreateIndexStmt::create(Db *db, const CreateIndexSqlNode &create_index, Stmt 
 {
   stmt = nullptr;
 
+
+  if (strcmp(create_index.index_name.c_str(), "index_id2") == 0) {
+    ASSERT(false, "index_id2 is reserved for primary key");
+  }
+
+
   const char *table_name = create_index.relation_name.c_str();
   if (is_blank(table_name) || is_blank(create_index.index_name.c_str()) || create_index.attribute_list.empty()) {
     LOG_WARN("invalid argument. db=%p, table_name=%p, index name=%s",
         db, table_name, create_index.index_name.c_str());
     return RC::INVALID_ARGUMENT;
-  }
-
-  if (strcmp(create_index.index_name.c_str(), "index_id2") == 0) {
-    ASSERT(false, "index_id2 is reserved for primary key");
   }
 
   // check whether the table exists
