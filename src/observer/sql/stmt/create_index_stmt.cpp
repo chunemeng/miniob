@@ -30,6 +30,10 @@ RC CreateIndexStmt::create(Db *db, const CreateIndexSqlNode &create_index, Stmt 
     ASSERT(false, "index_id2 is reserved for primary key");
   }
 
+  if (strcmp(create_index.index_name.c_str(), "index_id") == 0) {
+    ASSERT(false, "index_id is reserved for primary key");
+  }
+
 
   const char *table_name = create_index.relation_name.c_str();
   if (is_blank(table_name) || is_blank(create_index.index_name.c_str()) || create_index.attribute_list.empty()) {
