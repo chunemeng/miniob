@@ -97,7 +97,16 @@ public:
         right.set_data(v2 + attr_types_[i].offset, attr_types_[i].length);
       }
 
+      if (right.attr_type() == AttrType::NULLS) {
+        return 1;
+      }
+
+      if (left.attr_type() == AttrType::NULLS) {
+        return -1;
+      }
+
       int result = DataType::type_instance(attr_types_[i].type)->compare(left, right);
+
       if (result != 0) {
         return result;
       }
