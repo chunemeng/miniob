@@ -738,3 +738,48 @@ RC Table::update_record(Record &record, vector<const FieldMeta *> &field_meta, v
 
   return rc;
 }
+RC Table::make_record(
+    const Record &record, vector<const FieldMeta *> &field_meta, vector<Value> &values, Record &new_record)
+{
+  RC rc = RC::SUCCESS;
+
+  auto data = new char[table_meta_.record_size()];
+  memcpy(data, record.data(), table_meta_.record_size());
+  auto null_map = reinterpret_cast<int *>(data + table_meta_.null_field_offset());
+
+  for (int i = 0; i < field_meta.size(); i++) {
+    const FieldMeta *field = field_meta[i];
+    const Value     &value = values[i];
+
+    // TODO: optimize this
+    if (value.attr_type() == AttrType::NULLS) {
+      if (!field->nullable()) {
+        LOG_WARN("insert null into not nullable field. table name:%s,field name:%s,value:%s ",
+            table_meta_.name(), field->name().c_str(), value.to_string().c_str());
+        rc = RC::INVALID_ARGUMENT;
+      }
+      null_map[0] |= (1 << (field->field_id()));
+    } else {
+      if (field->type() != value.attr_type()) {
+        Value real_value;
+        rc = Value::cast_to(value, field->type(), real_value);
+        if (OB_FAIL(rc)) {
+          LOG_WARN("failed to cast value. table name:%s,field name:%s,value:%s ",
+            table_meta_.name(), field->name().c_str(), value.to_string().c_str());
+        }
+        rc = set_value_to_record(data, real_value, field);
+      } else {
+        rc = set_value_to_record(data, value, field);
+      }
+    }
+  }
+
+  new_record.set_data(data, table_meta_.record_size());
+  new_record.set_rid(record.rid());
+
+  if (OB_FAIL(rc)) {
+    LOG_WARN("failed to update record. table name:%s", table_meta_.name());
+    return rc;
+  }
+  return rc;
+}

@@ -47,9 +47,15 @@ RC UpdatePhysicalOperator::open(Trx *trx)
   }
 
   for (Record &record : records_) {
-    rc = table_->update_record(record, field_meta_, values);
+    Record new_record;
+    rc = table_->make_record(record, field_meta_, values, new_record);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to update record: %s", strrc(rc));
+      return rc;
+    }
+    rc = trx_->update_record(table_, record, new_record);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to delete record: %s", strrc(rc));
       return rc;
     }
   }

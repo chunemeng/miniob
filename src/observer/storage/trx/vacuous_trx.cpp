@@ -45,3 +45,11 @@ RC VacuousTrx::commit() { return RC::SUCCESS; }
 RC VacuousTrx::rollback() { return RC::SUCCESS; }
 
 RC VacuousTrx::redo(Db *, const LogEntry &) { return RC::SUCCESS; }
+RC VacuousTrx::update_record(Table *table, Record &record, Record &new_record)
+{
+  RC rc = table->delete_record(record);
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
+  return table->insert_record(new_record);
+}
