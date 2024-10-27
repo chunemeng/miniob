@@ -5,9 +5,7 @@
 
 RC UpdatePhysicalOperator::open(Trx *trx)
 {
-  LOG_INFO("open update operator");
   if (children_.empty()) {
-    LOG_INFO("no child operator");
     return RC::SUCCESS;
   }
 
@@ -35,6 +33,11 @@ RC UpdatePhysicalOperator::open(Trx *trx)
   }
 
   child->close();
+
+  if (records_.empty()) {
+    LOG_WARN("no records to update");
+    return RC::SUCCESS;
+  }
 
   rc = RC::SUCCESS;
 

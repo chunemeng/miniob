@@ -64,9 +64,7 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
 
   RC rc = RC::SUCCESS;
 
-  LOG_INFO("update expr size: %d", exprs.size());
-  for (int i = 0; i < exprs.size(); ++i) {
-    LOG_INFO("update expr type: %d", exprs[i]->type());
+  for (size_t i = 0; i < exprs.size(); ++i) {
     if (exprs[i]->type() != ExprType::COMPARISON) {
       LOG_WARN("invalid update expr type.");
       return RC::INVALID_ARGUMENT;
