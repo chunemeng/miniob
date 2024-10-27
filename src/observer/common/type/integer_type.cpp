@@ -54,11 +54,18 @@ RC IntegerType::negative(const Value &val, Value &result) const
 
 RC IntegerType::cast_to(const Value &val, AttrType type, Value &result) const
 {
+  RC rc = RC::SUCCESS;
   switch (type) {
+    case AttrType::INTS: result.set_int(val.get_int()); break;
+    case AttrType::CHARS: {
+      std::string s;
+      rc = to_string(val, s);
+      result.set_string(s.c_str(), static_cast<int>(s.size()));
+    } break;
     case AttrType::FLOATS: result.set_float((float)val.get_int()); break;
     default: return RC::UNIMPLEMENTED;
   }
-  return RC::SUCCESS;
+  return rc;
 }
 
 RC IntegerType::set_value_from_str(Value &val, const string &data) const

@@ -8,6 +8,7 @@ EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
 MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 See the Mulan PSL v2 for more details. */
 
+#include <cmath>
 #include "common/lang/comparator.h"
 #include "common/lang/sstream.h"
 #include "common/log/log.h"
@@ -61,7 +62,7 @@ RC FloatType::negative(const Value &val, Value &result) const
 
 RC FloatType::set_value_from_str(Value &val, const string &data) const
 {
-  RC                rc = RC::SUCCESS;
+  RC           rc = RC::SUCCESS;
   stringstream deserialize_stream;
   deserialize_stream.clear();
   deserialize_stream.str(data);
@@ -82,4 +83,20 @@ RC FloatType::to_string(const Value &val, string &result) const
   ss << common::double_to_str(val.value_.float_value_);
   result = ss.str();
   return RC::SUCCESS;
+}
+RC FloatType::cast_to(const Value &val, AttrType type, Value &result) const
+{
+  RC rc = RC::SUCCESS;
+  switch (type) {
+    case AttrType::INTS: result.set_int(static_cast<int>(std::round(val.get_float()))); break;
+    case AttrType::FLOATS: result.set_float(val.get_float()); break;
+    case AttrType::CHARS: {
+      std::string s;
+      rc = to_string(val, s);
+      result.set_string(s.c_str(), static_cast<int>(s.size()));
+      break;
+    }
+    default: return RC::UNSUPPORTED;
+  }
+  return rc;
 }

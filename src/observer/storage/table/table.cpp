@@ -686,7 +686,7 @@ RC Table::update_record(Record &record, vector<const FieldMeta *> &field_meta, v
   memcpy(data, record.data(), table_meta_.record_size());
   auto null_map = reinterpret_cast<int *>(data + table_meta_.null_field_offset());
 
-  for (int i = 0; i < field_meta.size(); i++) {
+  for (size_t i = 0; i < field_meta.size(); i++) {
     const FieldMeta *field = field_meta[i];
     const Value     &value = values[i];
 
@@ -746,11 +746,12 @@ RC Table::make_record(
   auto data = new char[table_meta_.record_size()];
   memcpy(data, record.data(), table_meta_.record_size());
   auto null_map = reinterpret_cast<int *>(data + table_meta_.null_field_offset());
+  LOG_INFO("field name:%d, value:%d", field_meta.size(), values.size());
 
-  for (int i = 0; i < field_meta.size(); i++) {
+  for (size_t i = 0; i < field_meta.size(); i++) {
     const FieldMeta *field = field_meta[i];
     const Value     &value = values[i];
-
+    LOG_INFO("field name:%s, value:%s", field->name().c_str(), value.to_string().c_str());
     // TODO: optimize this
     if (value.attr_type() == AttrType::NULLS) {
       if (!field->nullable()) {

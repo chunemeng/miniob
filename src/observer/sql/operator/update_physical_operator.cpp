@@ -5,7 +5,9 @@
 
 RC UpdatePhysicalOperator::open(Trx *trx)
 {
+  LOG_INFO("open update operator");
   if (children_.empty()) {
+    LOG_INFO("no child operator");
     return RC::SUCCESS;
   }
 
@@ -21,6 +23,7 @@ RC UpdatePhysicalOperator::open(Trx *trx)
 
   // Collect records before updating
   while (OB_SUCC(rc = child->next())) {
+    LOG_INFO("get next record %d", child->type());
     Tuple *tuple = child->current_tuple();
     if (nullptr == tuple) {
       LOG_WARN("failed to get current record: %s", strrc(rc));
@@ -38,7 +41,7 @@ RC UpdatePhysicalOperator::open(Trx *trx)
 
   std::vector<Value> values(field_meta_.size());
 
-  for (int i = 0; i < field_meta_.size(); ++i) {
+  for (size_t i = 0; i < field_meta_.size(); ++i) {
     rc = value_[i]->try_get_value(values[i]);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to evaluate expression: %s", strrc(rc));

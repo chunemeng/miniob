@@ -79,7 +79,7 @@ public:
     // TODO: optimized the comparison
     auto null_map1 = (int32_t *)(v1);
     auto null_map2 = (int32_t *)(v2);
-    for (int i = null_field_num_; i < attr_types_.size(); i++) {
+    for (size_t i = null_field_num_; i < attr_types_.size(); i++) {
       Value left;
       int   field_id = attr_types_[i].field_id;
       if (null_map1[field_id / 32] & (1 << (field_id % 32))) {
@@ -179,7 +179,7 @@ public:
     std::string s;
     auto        null_map = (uint8_t *)(v);
 
-    for (int i = null_field_num_; i < attr_types_.size(); i++) {
+    for (size_t i = null_field_num_; i < attr_types_.size(); i++) {
       if (i != null_field_num_) {
         s += ",";
       }
