@@ -232,6 +232,7 @@ UnboundAggregateExpr *create_aggregate_expression(AggrType aggregate_name,
 %type <number>              order_opt
 %type <expression>          order_b
 %type <expression_list>     order_by
+%type <expression_list>     order_by_list
 %type <expression_list>     assign_list
 %type <number>              null_t
 %type <string>              relation
@@ -627,33 +628,27 @@ update_stmt:      /*  update 语句的语法解析树*/
 
   order_opt:
     ASC {
-      $$ = 1;
+      $$ = 0;
     }
     | DESC {
-      $$ = 0;
+      $$ = 1;
     }
     | /* empty */
     {
-      $$ = 1;
+      $$ = 0;
     }
     ;
 
 
-
 order_b:
- ORDER BY rel_attr order_opt
+    rel_attr order_opt
     {
-      $$ = new OrderByExpr($3->relation_name, $3->attribute_name, $4);
-      delete $3;
+      $$ = new OrderByExpr($1->relation_name, $1->attribute_name, $2);
+      delete $1;
     }
-;
-
+    ;
 order_by:
-    /* empty */
-    {
-      $$ = nullptr;
-    }
-    | order_b
+    order_b
     {
       $$ = new std::vector<std::unique_ptr<Expression>>;
       $$->emplace_back($1);
@@ -669,11 +664,24 @@ order_by:
     }
     ;
 
+order_by_list:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | ORDER BY order_by
+    {
+      $$ = $3;
+    }
+    ;
+
+
+
 
 
 
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT expression_list FROM rel_table_list inner_joins where group_by order_by
+    SELECT expression_list FROM rel_table_list inner_joins where group_by order_by_list
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -963,7 +971,7 @@ rel_table_list:
       }
       free($1);
     }
-    | relation as_opt COMMA rel_list {
+    | relation as_opt COMMA rel_table_list {
       if ($4 != nullptr) {
         $$ = $4;
       } else {

@@ -145,17 +145,12 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   }
 
   std::unique_ptr<LogicalOperator> order_by_oper;
-  rc = create_group_by_plan(select_stmt, group_by_oper);
-  if (OB_FAIL(rc)) {
-    LOG_WARN("failed to create group by logical plan. rc=%s", strrc(rc));
-    return rc;
-  }
-
-  if (order_by_oper) {
+  if (!select_stmt->order_by().empty()) {
+    order_by_oper = std::make_unique<OrderByLogicalOperator>(select_stmt->order_by());
     if (*last_oper) {
+      LOG_INFO("add order by oper");
       order_by_oper->add_child(std::move(*last_oper));
     }
-
     last_oper = &order_by_oper;
   }
 
@@ -350,10 +345,5 @@ RC LogicalPlanGenerator::create_group_by_plan(SelectStmt *select_stmt, unique_pt
   auto group_by_oper =
       make_unique<GroupByLogicalOperator>(std::move(group_by_expressions), std::move(aggregate_expressions));
   logical_operator = std::move(group_by_oper);
-  return RC::SUCCESS;
-}
-RC LogicalPlanGenerator::create_order_by_plan(SelectStmt *select_stmt, unique_ptr<LogicalOperator> &logical_operator)
-{
-  logical_operator = std::make_unique<OrderByLogicalOperator>(select_stmt->order_by());
   return RC::SUCCESS;
 }

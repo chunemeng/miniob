@@ -7,7 +7,9 @@ class OrderByPhysicalOperator : public PhysicalOperator
 {
 public:
   OrderByPhysicalOperator();
-  explicit OrderByPhysicalOperator(std::vector<std::unique_ptr<Expression>> &condition) : expressions(std::move(condition)) {}
+  explicit OrderByPhysicalOperator(std::vector<std::unique_ptr<Expression>> &condition)
+      : expressions(std::move(condition))
+  {}
 
   virtual ~OrderByPhysicalOperator() = default;
 
@@ -19,9 +21,9 @@ public:
   Tuple *current_tuple() override;
 
 private:
-  Trx                 *trx_ = nullptr;
-  std::vector<Tuple *> tuples_;
-  int                  index_ = 0;
-
+  Trx                                     *trx_   = nullptr;
+  int                                      index_ = -2;
+  ValueListTuple                           tuple_;
+  std::vector<std::vector<Value>>          tuple_in_value;
   std::vector<std::unique_ptr<Expression>> expressions;
 };

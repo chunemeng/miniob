@@ -45,7 +45,6 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   vector<Table *> tables;
   for (size_t i = 0; i < select_sql.relations.size(); i++) {
     const auto &table_name = select_sql.relations[i];
-
     if (table_name.relation_name.empty()) {
       LOG_WARN("invalid argument. relation name is null. index=%d", i);
       return RC::INVALID_ARGUMENT;
@@ -105,7 +104,6 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
 
   vector<unique_ptr<Expression>> group_by_expressions;
   for (unique_ptr<Expression> &expression : select_sql.group_by) {
-    LOG_INFO("group by expression: %s", expression->name());
     RC rc = expression_binder.bind_expression(expression, group_by_expressions, should_alis);
     if (OB_FAIL(rc)) {
       LOG_INFO("bind expression failed. rc=%s", strrc(rc));
@@ -115,7 +113,6 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
 
   std::vector<unique_ptr<Expression>> order_by_expressions;
   for (unique_ptr<Expression> &expression : select_sql.order_bys) {
-    LOG_INFO("order by expression: %s", expression->name());
     RC rc = expression_binder.bind_expression(expression, order_by_expressions);
     if (OB_FAIL(rc)) {
       LOG_INFO("bind expression failed. rc=%s", strrc(rc));

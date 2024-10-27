@@ -354,12 +354,19 @@ public:
   virtual ~ValueListTuple() = default;
 
   void set_names(const std::vector<TupleCellSpec> &specs) { specs_ = specs; }
+  void set_names(std::vector<TupleCellSpec> &&specs) { specs_ = std::move(specs); }
   void set_cells(const std::vector<Value> &cells) { cells_ = cells; }
+  void set_cells(std::vector<Value> &&cells) { cells_ = std::move(cells); }
 
-  virtual int cell_num() const override { return static_cast<int>(cells_.size()); }
+  virtual int cell_num() const override
+  {
+    LOG_INFO("cell_num=%d", static_cast<int>(cells_.size()));
+    return static_cast<int>(cells_.size());
+  }
 
   virtual RC cell_at(int index, Value &cell) const override
   {
+    LOG_INFO("cell_at index=%d", index);
     if (index < 0 || index >= cell_num()) {
       return RC::NOTFOUND;
     }

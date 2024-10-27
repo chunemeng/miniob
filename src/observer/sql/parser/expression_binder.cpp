@@ -596,5 +596,6 @@ RC ExpressionBinder::bind_order_by_expression(
 
     table_name = context_.table_map().begin()->first;
   }
+  bound_expressions.emplace_back(std::move(order_by_expr));
   return RC::SUCCESS;
 }
