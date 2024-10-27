@@ -39,6 +39,7 @@ public:
 
   int cell_num() const override;
   RC  cell_at(int index, Value &cell) const override;
+  RC  find_cell_index(const TupleCellSpec &spec, int &index) const override;
   RC  spec_at(int index, TupleCellSpec &spec) const override;
   RC  find_cell(const TupleCellSpec &spec, Value &cell) const override;
 

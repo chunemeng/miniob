@@ -49,6 +49,7 @@ enum class ExprType
   VALUE_LIST,   ///< 值列表
   SUBQUERY,     ///< 子查询
   AGGREGATION,  ///< 聚合运算
+  ORDER_BY,     ///< 排序
 };
 
 /**
@@ -135,6 +136,36 @@ protected:
 
 private:
   std::string name_;
+};
+
+class OrderByExpr : public Expression
+{
+public:
+  OrderByExpr(std::string &relation_name, std::string field_name, bool is_desc)
+      : relation_name_(relation_name), field_name_(field_name), is_desc_(is_desc)
+  {}
+  virtual ~OrderByExpr() = default;
+
+  ExprType type() const override { return ExprType::ORDER_BY; }
+  AttrType value_type() const override { return AttrType::NULLS; }
+
+  RC get_value(const Tuple &tuple, Value &value) const override { return RC::INTERNAL; }
+  RC try_get_value(Value &value) const override
+  {
+    value.set_boolean(is_desc_);
+    return RC::SUCCESS;
+  }
+
+  std::string &get_table_name() { return relation_name_; }
+
+  const std::string &table_name() const { return relation_name_; }
+  const std::string &field_name() const { return field_name_; }
+  bool               is_desc() const { return is_desc_; }
+
+private:
+  std::string relation_name_;
+  std::string field_name_;
+  bool        is_desc_;
 };
 
 class StarExpr : public Expression

@@ -86,6 +86,8 @@ public:
    */
   virtual RC cell_at(int index, Value &cell) const = 0;
 
+  virtual RC find_cell_index(const TupleCellSpec &spec, int &index) const = 0;
+
   virtual RC spec_at(int index, TupleCellSpec &spec) const = 0;
 
   /**
@@ -218,10 +220,27 @@ public:
     return RC::SUCCESS;
   }
 
+  RC find_cell_index(const TupleCellSpec &spec, int &index) const override
+  {
+    if (!spec.table_name_str().empty() && spec.table_name_str() != table_->name()) {
+      return RC::NOTFOUND;
+    }
+
+    for (size_t i = 0; i < speces_.size(); ++i) {
+      const FieldExpr *field_expr = speces_[i];
+      const Field     &field      = field_expr->field();
+      if (spec.field_name() == field.field_name()) {
+        index = static_cast<int>(i);
+        return RC::SUCCESS;
+      }
+    }
+    return RC::NOTFOUND;
+  }
+
   RC find_cell(const TupleCellSpec &spec, Value &cell) const override
   {
-    const auto& table_name = spec.table_name_str();
-    const auto& field_name = spec.field_name();
+    const auto &table_name = spec.table_name_str();
+    const auto &field_name = spec.field_name();
     if (table_name != table_->name()) {
       return RC::NOTFOUND;
     }
@@ -281,6 +300,12 @@ public:
 
   int cell_num() const override { return static_cast<int>(expressions_.size()); }
 
+  RC find_cell_index(const TupleCellSpec &spec, int &index) const override
+  {
+    // FIXME: IS THIS RIGHT?
+    return tuple_->find_cell_index(spec, index);
+  }
+
   RC cell_at(int index, Value &cell) const override
   {
     if (index < 0 || index >= cell_num()) {
@@ -289,8 +314,6 @@ public:
     if (tuple_ == nullptr) {
       return RC::INTERNAL;
     }
-
-    LOG_INFO("cell_at index=%d", index);
 
     Expression *expr = expressions_[index].get();
     return expr->get_value(*tuple_, cell);
@@ -343,6 +366,18 @@ public:
 
     cell = cells_[index];
     return RC::SUCCESS;
+  }
+
+  RC find_cell_index(const TupleCellSpec &spec, int &index) const override
+  {
+    const int size = static_cast<int>(specs_.size());
+    for (int i = 0; i < size; i++) {
+      if (specs_[i].equals(spec)) {
+        index = i;
+        return RC::SUCCESS;
+      }
+    }
+    return RC::NOTFOUND;
   }
 
   RC spec_at(int index, TupleCellSpec &spec) const override
@@ -425,6 +460,18 @@ public:
     }
 
     return RC::NOTFOUND;
+  }
+
+  RC find_cell_index(const TupleCellSpec &spec, int &index) const override
+  {
+    RC rc = left_->find_cell_index(spec, index);
+    if (rc == RC::SUCCESS || rc != RC::NOTFOUND) {
+      return rc;
+    }
+
+    rc = right_->find_cell_index(spec, index);
+    index += left_->cell_num();
+    return rc;
   }
 
   RC spec_at(int index, TupleCellSpec &spec) const override

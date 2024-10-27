@@ -52,6 +52,18 @@ public:
     return RC::SUCCESS;
   }
 
+  RC find_cell_index(const TupleCellSpec &spec, int &index) const override
+  {
+    index = -1;
+    for (size_t i = 0; i < expressions_.size(); ++i) {
+      if (spec.alias_str() == expressions_[i]->name()) {
+        index = static_cast<int>(i);
+        return RC::SUCCESS;
+      }
+    }
+    return RC::NOTFOUND;
+  }
+
   RC find_cell(const TupleCellSpec &spec, Value &cell) const override
   {
     RC rc = RC::SUCCESS;

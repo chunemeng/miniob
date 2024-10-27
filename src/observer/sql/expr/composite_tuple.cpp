@@ -64,8 +64,23 @@ RC CompositeTuple::find_cell(const TupleCellSpec &spec, Value &cell) const
 
 void CompositeTuple::add_tuple(unique_ptr<Tuple> tuple) { tuples_.push_back(std::move(tuple)); }
 
-Tuple &CompositeTuple::tuple_at(size_t index) 
-{ 
+Tuple &CompositeTuple::tuple_at(size_t index)
+{
   ASSERT(index < tuples_.size(), "index=%d, tuples_size=%d", index, tuples_.size());
-  return *tuples_[index]; 
+  return *tuples_[index];
+}
+RC CompositeTuple::find_cell_index(const TupleCellSpec &spec, int &index) const
+{
+  RC  rc           = RC::NOTFOUND;
+  int index_offset = 0;
+  for (const auto &tuple : tuples_) {
+    int indd;
+    rc = tuple->find_cell_index(spec, indd);
+    if (OB_SUCC(rc)) {
+      index = index_offset + indd;
+      break;
+    }
+    index_offset += tuple->cell_num();
+  }
+  return rc;
 }

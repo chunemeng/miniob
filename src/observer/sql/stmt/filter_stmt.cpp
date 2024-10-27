@@ -25,7 +25,6 @@ RC FilterStmt::create(Table *default_table, const ConditionSqlNode *conditions, 
 {
   BinderContext binder_context;
   binder_context.add_table(default_table->name(), default_table);
-  binder_context.real_table_num()++;
   ExpressionBinder binder(binder_context);
   return create(binder, conditions, condition_num, stmt);
 }

@@ -24,8 +24,12 @@ using namespace common;
 
 Table *BinderContext::find_table(const string &table_name) const
 {
-  auto iter = table_map_.find(table_name);
-  return iter == table_map_.end() ? nullptr : iter->second;
+  auto alias_iter = alias_map_.find(table_name);
+  if (alias_iter != alias_map_.end()) {
+    auto table_iter = table_map_.find(alias_iter->second);
+    return table_iter == table_map_.end() ? nullptr : table_iter->second;
+  }
+  return nullptr;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -98,6 +102,9 @@ RC ExpressionBinder::bind_expression(
     case ExprType::AGGREGATION: {
       ASSERT(false, "shouldn't be here");
     } break;
+    case ExprType::ORDER_BY: {
+      return bind_order_by_expression(expr, bound_expressions);
+    } break;
 
     default: {
       LOG_WARN("unknown expression type: %d", static_cast<int>(expr->type()));
@@ -150,7 +157,7 @@ RC ExpressionBinder::bind_unbound_field_expression(
 
   Table *table = nullptr;
   if (is_blank(table_name)) {
-    if (context_.real_table_num() != 1) {
+    if (context_.table_map().size() != 1) {
       LOG_INFO("cannot determine table for field: %s", field_name.c_str());
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
@@ -567,5 +574,27 @@ RC ExpressionBinder::bind_valuelist_expression(
     return rc;
   }
   bound_expressions.emplace_back(std::move(value_expr));
+  return RC::SUCCESS;
+}
+RC ExpressionBinder::bind_order_by_expression(
+    unique_ptr<Expression> &order_by_expr, vector<std::unique_ptr<Expression>> &bound_expressions)
+{
+  if (nullptr == order_by_expr) {
+    return RC::SUCCESS;
+  }
+
+  auto expr = static_cast<OrderByExpr *>(order_by_expr.get());
+
+  auto       &table_name = expr->get_table_name();
+  const auto &field_name = expr->field_name();
+
+  if (is_blank(table_name)) {
+    if (context_.table_map().size() != 1) {
+      LOG_INFO("cannot determine table for field: %s", field_name.c_str());
+      return RC::SCHEMA_TABLE_NOT_EXIST;
+    }
+
+    table_name = context_.table_map().begin()->first;
+  }
   return RC::SUCCESS;
 }

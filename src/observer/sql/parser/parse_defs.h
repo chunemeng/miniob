@@ -102,6 +102,13 @@ struct InnerJoinSqlNode
   std::vector<ConditionSqlNode> conditions;
 };
 
+struct OrderBySqlNode
+{
+  std::string relation_name;
+  std::string attribute_name;
+  bool        is_desc = false;
+};
+
 /**
  * @brief 描述一个select语句
  * @ingroup SQLParser
@@ -119,6 +126,7 @@ struct SelectSqlNode
   std::vector<RelAttrSqlNode>              relations;    ///< 查询的表
   std::vector<ConditionSqlNode>            conditions;   ///< 查询条件，使用AND串联起来多个条件
   std::vector<InnerJoinSqlNode>            inner_joins;  ///< inner join
+  std::vector<std::unique_ptr<Expression>> order_bys;    ///< order by clause
   std::vector<std::unique_ptr<Expression>> group_by;     ///< group by clause
 };
 

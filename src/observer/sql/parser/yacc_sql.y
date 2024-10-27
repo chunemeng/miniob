@@ -124,6 +124,7 @@ UnboundAggregateExpr *create_aggregate_expression(AggrType aggregate_name,
         LBRACKET
         RBRACKET
         GROUP
+        ORDER
         UNIQUE
         TABLE
         TABLES
@@ -132,6 +133,7 @@ UnboundAggregateExpr *create_aggregate_expression(AggrType aggregate_name,
         SELECT
         EXISTS
         DESC
+        ASC
         SHOW
         SYNC
         INSERT
@@ -227,6 +229,9 @@ UnboundAggregateExpr *create_aggregate_expression(AggrType aggregate_name,
 %type <number>              number
 %type <number>              unique_op
 %type <expression>          eq_expr
+%type <number>              order_opt
+%type <expression>          order_b
+%type <expression_list>     order_by
 %type <expression_list>     assign_list
 %type <number>              null_t
 %type <string>              relation
@@ -242,6 +247,7 @@ UnboundAggregateExpr *create_aggregate_expression(AggrType aggregate_name,
 %type <condition_list>      condition_list
 %type <string>              storage_format
 %type <rel_attr_list>       rel_list
+%type <rel_attr_list>       rel_table_list
 %type <expression>          expression
 %type <expression_list>     expression_list
 %type <expression_list>     group_by
@@ -618,8 +624,56 @@ update_stmt:      /*  update 语句的语法解析树*/
       free($2);
     }
     ;
+
+  order_opt:
+    ASC {
+      $$ = 1;
+    }
+    | DESC {
+      $$ = 0;
+    }
+    | /* empty */
+    {
+      $$ = 1;
+    }
+    ;
+
+
+
+order_b:
+ ORDER BY rel_attr order_opt
+    {
+      $$ = new OrderByExpr($3->relation_name, $3->attribute_name, $4);
+      delete $3;
+    }
+;
+
+order_by:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | order_b
+    {
+      $$ = new std::vector<std::unique_ptr<Expression>>;
+      $$->emplace_back($1);
+    }
+    | order_b COMMA order_by
+    {
+      if ($3 != nullptr) {
+        $$ = $3;
+      } else {
+        $$ = new std::vector<std::unique_ptr<Expression>>;
+      }
+      $$->insert($$->begin(),std::unique_ptr<Expression>($1));
+    }
+    ;
+
+
+
+
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT expression_list FROM rel_list inner_joins where group_by
+    SELECT expression_list FROM rel_table_list inner_joins where group_by order_by
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -646,6 +700,11 @@ select_stmt:        /*  select 语句的语法解析树*/
       if ($7 != nullptr) {
         $$->selection.group_by.swap(*$7);
         delete $7;
+      }
+
+      if ($8 != nullptr) {
+        $$->selection.order_bys.swap(*$8);
+        delete $8;
       }
     }
     ;
@@ -887,7 +946,8 @@ relation:
       $$ = $1;
     }
     ;
-rel_list:
+
+rel_table_list:
     relation as_opt {
       $$ = new std::vector<RelAttrSqlNode>();
       if ($2 != nullptr) {
@@ -920,6 +980,32 @@ rel_list:
         node.relation_name = $1;
         $$->insert($$->begin(), node);
       }
+      free($1);
+    }
+    ;
+
+
+rel_list:
+    relation {
+      $$ = new std::vector<RelAttrSqlNode>();
+
+        RelAttrSqlNode node;
+        node.attribute_name = $1;
+        $$->push_back(node);
+
+      free($1);
+    }
+    | relation COMMA rel_list {
+      if ($3 != nullptr) {
+        $$ = $3;
+      } else {
+        $$ = new std::vector<RelAttrSqlNode>();
+      }
+
+        RelAttrSqlNode node;
+        node.attribute_name = $1;
+        $$->insert($$->begin(), node);
+
       free($1);
     }
     ;

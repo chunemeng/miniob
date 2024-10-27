@@ -24,19 +24,30 @@ public:
   BinderContext()          = default;
   virtual ~BinderContext() = default;
 
-  bool add_table(const std::string &name, Table *table)
+  void add_table(const std::string &name, Table *table)
   {
-    auto iter = table_map_.emplace(name, table);
-    if (!iter.second) {
-      return false;
-    }
+    table_map_.emplace(name, table);
+    add_alias(name, name);
     table_ordered_.emplace_back(table);
-    return true;
   }
 
-  int &real_table_num() { return real_table_num_; }
-
   void set_db(Db *db) { this->db_ = db; }
+
+  bool add_alias(const std::string &alias, const std::string &table_name)
+  {
+    auto iter = alias_map_.emplace(alias, table_name);
+    return iter.second;
+  }
+
+  RC get_alias(const std::string &alias, std::string &table_name) const
+  {
+    auto iter = alias_map_.find(alias);
+    if (iter == alias_map_.end()) {
+      return RC::NOT_EXIST;
+    }
+    table_name = iter->second;
+    return RC::SUCCESS;
+  }
 
   Table *find_table(const std::string &table_name) const;
 
@@ -45,9 +56,10 @@ public:
   Db                                       *get_db() const { return db_; }
 
 private:
-  Db                                      *db_             = nullptr;
-  int                                      real_table_num_ = 0;
-  std::unordered_map<std::string, Table *> table_map_;
+  Db                                          *db_             = nullptr;
+  int                                          real_table_num_ = 0;
+  std::unordered_map<std::string, Table *>     table_map_;
+  std::unordered_map<std::string, std::string> alias_map_;
   // use for output the table in order
   std::vector<Table *> table_ordered_;
 };
@@ -66,12 +78,15 @@ public:
       bool should_alis = false);
 
 private:
+
   RC bind_subquery_expression(
       std::unique_ptr<Expression> &subquery_expr, std::vector<std::unique_ptr<Expression>> &bound_expressions);
   RC bind_star_expression(std::unique_ptr<Expression> &star_expr,
       std::vector<std::unique_ptr<Expression>> &bound_expressions, bool should_alis = false);
   RC bind_unbound_field_expression(std::unique_ptr<Expression> &unbound_field_expr,
       std::vector<std::unique_ptr<Expression>> &bound_expressions, bool should_alis = false);
+  RC bind_order_by_expression(
+      std::unique_ptr<Expression> &order_by_expr, std::vector<std::unique_ptr<Expression>> &bound_expressions);
   RC bind_field_expression(
       std::unique_ptr<Expression> &field_expr, std::vector<std::unique_ptr<Expression>> &bound_expressions);
   RC bind_value_expression(
