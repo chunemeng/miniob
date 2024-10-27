@@ -940,7 +940,7 @@ RC BplusTreeHandler::create(LogHandler &log_handler, bool is_unique, DiskBufferP
   file_header->null_field_num    = null_field_num;
   file_header->is_unique         = is_unique;
 
-  for (int i = 0; i < field_metas.size(); i++) {
+  for (size_t i = 0; i < field_metas.size(); i++) {
     file_header->attr_info[i] = attr_type_infos[i];
   }
 

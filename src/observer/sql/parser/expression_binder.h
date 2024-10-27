@@ -24,21 +24,19 @@ public:
   BinderContext()          = default;
   virtual ~BinderContext() = default;
 
-  void add_table(const char *name, Table *table)
+  bool add_table(const std::string &name, Table *table)
   {
-    table_map_.emplace(name, table);
+    auto iter = table_map_.emplace(name, table);
+    if (!iter.second) {
+      return false;
+    }
     table_ordered_.emplace_back(table);
+    return true;
   }
 
-  void add_table(const std::string &name, Table *table)
-  {
-    table_map_.emplace(name, table);
-    table_ordered_.emplace_back(table);
-  }
+  int &real_table_num() { return real_table_num_; }
 
   void set_db(Db *db) { this->db_ = db; }
-
-  Table *find_table(const char *table_name) const;
 
   Table *find_table(const std::string &table_name) const;
 
@@ -47,7 +45,8 @@ public:
   Db                                       *get_db() const { return db_; }
 
 private:
-  Db                                      *db_ = nullptr;
+  Db                                      *db_             = nullptr;
+  int                                      real_table_num_ = 0;
   std::unordered_map<std::string, Table *> table_map_;
   // use for output the table in order
   std::vector<Table *> table_ordered_;

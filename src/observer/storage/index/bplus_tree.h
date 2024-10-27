@@ -180,7 +180,7 @@ public:
     auto        null_map = (uint8_t *)(v);
 
     for (size_t i = null_field_num_; i < attr_types_.size(); i++) {
-      if (i != null_field_num_) {
+      if (i != static_cast<size_t>(null_field_num_)) {
         s += ",";
       }
       Value left;

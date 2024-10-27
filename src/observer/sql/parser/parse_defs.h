@@ -31,7 +31,7 @@ class Expression;
  * @ingroup SQLParser
  * @details 属性，或者说字段(column, field)
  * Rel -> Relation
- * Attr -> Attribute
+ * Attr -> Attribute | alias
  */
 struct RelAttrSqlNode
 {
@@ -98,7 +98,7 @@ struct OLD_ConditionNode
 
 struct InnerJoinSqlNode
 {
-  std::string                   relation_name;
+  RelAttrSqlNode                table_name;
   std::vector<ConditionSqlNode> conditions;
 };
 
@@ -116,7 +116,7 @@ struct InnerJoinSqlNode
 struct SelectSqlNode
 {
   std::vector<std::unique_ptr<Expression>> expressions;  ///< 查询的表达式
-  std::vector<std::string>                 relations;    ///< 查询的表
+  std::vector<RelAttrSqlNode>              relations;    ///< 查询的表
   std::vector<ConditionSqlNode>            conditions;   ///< 查询条件，使用AND串联起来多个条件
   std::vector<InnerJoinSqlNode>            inner_joins;  ///< inner join
   std::vector<std::unique_ptr<Expression>> group_by;     ///< group by clause
@@ -158,8 +158,8 @@ struct DeleteSqlNode
  */
 struct UpdateSqlNode
 {
-  std::string                   relation_name;   ///< Relation to update
-  std::vector<ConditionSqlNode> conditions;
+  std::string                              relation_name;  ///< Relation to update
+  std::vector<ConditionSqlNode>            conditions;
   std::vector<std::unique_ptr<Expression>> expressions;  ///< 更新的表达式
 };
 
@@ -205,11 +205,11 @@ struct DropTableSqlNode
  */
 struct CreateIndexSqlNode
 {
-  bool                     is_unique;       ///< 是否唯一索引
-  std::string              index_name;      ///< Index name
-  std::string              relation_name;   ///< Relation name
-  std::vector<std::string> attribute_list;  ///< Attribute name
-  bool                     unique = false;  ///< 是否是唯一索引
+  bool                        is_unique;       ///< 是否唯一索引
+  std::string                 index_name;      ///< Index name
+  std::string                 relation_name;   ///< Relation name
+  std::vector<RelAttrSqlNode> attribute_list;  ///< Attribute name
+  bool                        unique = false;  ///< 是否是唯一索引
 };
 
 /**

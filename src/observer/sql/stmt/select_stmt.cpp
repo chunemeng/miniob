@@ -43,41 +43,52 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
 
   // collect tables in `from` statement
   vector<Table *> tables;
+  auto           &num = binder_context.real_table_num();
   for (size_t i = 0; i < select_sql.relations.size(); i++) {
-    const char *table_name = select_sql.relations[i].c_str();
-    if (nullptr == table_name) {
+    const auto &table_name = select_sql.relations[i];
+    if (table_name.relation_name.empty()) {
       LOG_WARN("invalid argument. relation name is null. index=%d", i);
       return RC::INVALID_ARGUMENT;
     }
 
-    Table *table = db->find_table(table_name);
+    Table *table = db->find_table(table_name.relation_name);
     if (nullptr == table) {
-      LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
+      LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name.relation_name.c_str());
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
 
-    binder_context.add_table(table_name, table);
+    binder_context.add_table(table_name.relation_name, table);
+    if (!table_name.attribute_name.empty() && !binder_context.add_table(table_name.attribute_name, table)) {
+      LOG_WARN("alias name already exists. alias=%s, table_name=%s", table_name.attribute_name.c_str(), table_name.relation_name.c_str());
+      return RC::SCHEMA_ALIAS_NAME_REPEAT;
+    }
+    num++;
   }
-  bool should_alis = select_sql.inner_joins.size() > 0;
+  bool should_alis = !select_sql.inner_joins.empty();
 
   for (auto &node : select_sql.inner_joins) {
     for (auto &cond : node.conditions) {
       select_sql.conditions.emplace_back(cond);
     }
 
-    const char *table_name = node.relation_name.c_str();
-    if (nullptr == table_name) {
+    const auto &table_name_r = node.table_name;
+    if (table_name_r.relation_name.empty()) {
       LOG_WARN("invalid argument. relation name is null.");
       return RC::INVALID_ARGUMENT;
     }
 
-    Table *table = db->find_table(table_name);
+    Table *table = db->find_table(table_name_r.relation_name);
     if (nullptr == table) {
-      LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
+      LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name_r.relation_name.c_str());
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
 
-    binder_context.add_table(table_name, table);
+    binder_context.add_table(table_name_r.relation_name, table);
+    if (!table_name_r.attribute_name.empty() && !binder_context.add_table(table_name_r.attribute_name, table)) {
+      LOG_WARN("alias name already exists. alias=%s, table_name=%s", table_name_r.attribute_name.c_str(), table_name_r.relation_name.c_str());
+      return RC::SCHEMA_ALIAS_NAME_REPEAT;
+    }
+    num++;
   }
 
   // collect query fields in `select` statement

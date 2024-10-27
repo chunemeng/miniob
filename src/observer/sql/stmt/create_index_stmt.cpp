@@ -25,7 +25,6 @@ RC CreateIndexStmt::create(Db *db, const CreateIndexSqlNode &create_index, Stmt 
 {
   stmt = nullptr;
 
-
   const char *table_name = create_index.relation_name.c_str();
   if (is_blank(table_name) || is_blank(create_index.index_name.c_str()) || create_index.attribute_list.empty()) {
     LOG_WARN("invalid argument. db=%p, table_name=%p, index name=%s",
@@ -55,9 +54,9 @@ RC CreateIndexStmt::create(Db *db, const CreateIndexSqlNode &create_index, Stmt 
   }
 
   for (const auto &attr : create_index.attribute_list) {
-    const FieldMeta *field_meta = table->table_meta().field(attr.c_str());
+    const FieldMeta *field_meta = table->table_meta().field(attr.attribute_name);
     if (nullptr == field_meta) {
-      LOG_WARN("no such field in table. db=%s, table=%s, field name=%s", db->name(), table_name, attr.c_str());
+      LOG_WARN("no such field in table. db=%s, table=%s, field name=%s", db->name(), table_name, attr.attribute_name.c_str());
       return RC::SCHEMA_FIELD_NOT_EXIST;
     }
     index_fields.push_back(field_meta);

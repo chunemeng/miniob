@@ -167,12 +167,17 @@ public:
   ExprType type() const override { return ExprType::UNBOUND_FIELD; }
   AttrType value_type() const override { return AttrType::UNDEFINED; }
 
+  void set_alias(bool is_alias) { is_alias_ = is_alias; }
+
+  bool is_alias() const { return is_alias_; }
+
   RC get_value(const Tuple &tuple, Value &value) const override { return RC::INTERNAL; }
 
   const std::string &table_name() const { return table_name_; }
   const std::string &field_name() const { return field_name_; }
 
 private:
+  bool        is_alias_ = false;
   std::string table_name_;
   std::string field_name_;
 };

@@ -172,12 +172,13 @@ UnboundAggregateExpr *create_aggregate_expression(AggrType aggregate_name,
         INFILE
         EXPLAIN
         STORAGE
+        AS
         FORMAT
+        INNER_PRODUCT
         INNER
         JOIN
         L2_DIST
         COS_DIST
-        INNER_PRODUCT
         NULL_L
         NULL_T
         EQ
@@ -222,6 +223,7 @@ UnboundAggregateExpr *create_aggregate_expression(AggrType aggregate_name,
 %type <vec_list>            v_list
 %type <vec_list>            v_l
 %type <value>               value
+%type <string>              as_opt
 %type <number>              number
 %type <number>              unique_op
 %type <expression>          eq_expr
@@ -239,7 +241,7 @@ UnboundAggregateExpr *create_aggregate_expression(AggrType aggregate_name,
 %type <condition_list>      where
 %type <condition_list>      condition_list
 %type <string>              storage_format
-%type <relation_list>       rel_list
+%type <rel_attr_list>       rel_list
 %type <expression>          expression
 %type <expression_list>     expression_list
 %type <expression_list>     group_by
@@ -688,6 +690,16 @@ expression_list:
       $$->emplace_back($1);
     }
     ;
+as_opt:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | AS ID
+    {
+      $$ = $2;
+    }
+    ;
 expression:
     expression '+' expression {
       $$ = create_arithmetic_expression(ArithmeticExpr::Type::ADD, $1, $3, sql_string, &@$);
@@ -724,10 +736,18 @@ expression:
       $$->set_name(token_name(sql_string, &@$));
       delete $1;
     }
-    | rel_attr {
+    | rel_attr as_opt {
       RelAttrSqlNode *node = $1;
-      $$ = new UnboundFieldExpr(node->relation_name, node->attribute_name);
-      $$->set_name(token_name(sql_string, &@$));
+      UnboundFieldExpr * ex = new UnboundFieldExpr(node->relation_name, node->attribute_name);
+
+      if ($2 != nullptr) {
+        ex->set_alias(true);
+        ex->set_name($2);
+        free($2);
+      } else {
+        ex->set_name(token_name(sql_string, &@$));
+      }
+      $$ = ex;
       delete $1;
     }
     | LBRACE select_stmt RBRACE {
@@ -795,15 +815,33 @@ inner_joins:
     }
     ;
 inner_join:
-    INNER JOIN ID ON condition_list {
+    INNER JOIN ID as_opt ON condition_list {
       $$ = new InnerJoinSqlNode();
-      $$->relation_name = $3;
-      $$->conditions.swap(*$5);
+      RelAttrSqlNode node;
+      if ($4 != nullptr) {
+        node.attribute_name = $4;
+        node.relation_name = $3;
+        free($4);
+      } else {
+        node.relation_name = $3;
+      }
+        $$->table_name = node;
+      $$->conditions.swap(*$6);
+      delete $6;
       free($3);
     }
-    | INNER JOIN ID {
+    | INNER JOIN ID as_opt {
       $$ = new InnerJoinSqlNode();
-      $$->relation_name = $3;
+        RelAttrSqlNode node;
+        if ($4 != nullptr) {
+          node.attribute_name = $4;
+          node.relation_name = $3;
+          free($4);
+        } else {
+          node.relation_name = $3;
+        }
+
+      $$->table_name = node;
       free($3);
     }
     ;
@@ -850,19 +888,38 @@ relation:
     }
     ;
 rel_list:
-    relation {
-      $$ = new std::vector<std::string>();
-      $$->push_back($1);
+    relation as_opt {
+      $$ = new std::vector<RelAttrSqlNode>();
+      if ($2 != nullptr) {
+        RelAttrSqlNode node;
+        node.relation_name = $1;
+        node.attribute_name = $2;
+        $$->push_back(node);
+        free($2);
+      } else {
+        RelAttrSqlNode node;
+        node.relation_name = $1;
+        $$->push_back(node);
+      }
       free($1);
     }
-    | relation COMMA rel_list {
-      if ($3 != nullptr) {
-        $$ = $3;
+    | relation as_opt COMMA rel_list {
+      if ($4 != nullptr) {
+        $$ = $4;
       } else {
-        $$ = new std::vector<std::string>;
+        $$ = new std::vector<RelAttrSqlNode>();
       }
-
-      $$->insert($$->begin(), $1);
+      if ($2 != nullptr) {
+        RelAttrSqlNode node;
+        node.relation_name = $1;
+        node.attribute_name = $2;
+        $$->insert($$->begin(), node);
+        free($2);
+      } else {
+        RelAttrSqlNode node;
+        node.relation_name = $1;
+        $$->insert($$->begin(), node);
+      }
       free($1);
     }
     ;

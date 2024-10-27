@@ -22,11 +22,6 @@ See the Mulan PSL v2 for more details. */
 using namespace std;
 using namespace common;
 
-Table *BinderContext::find_table(const char *table_name) const
-{
-  auto iter = table_map_.find(table_name);
-  return iter == table_map_.end() ? nullptr : iter->second;
-}
 Table *BinderContext::find_table(const string &table_name) const
 {
   auto iter = table_map_.find(table_name);
@@ -155,7 +150,7 @@ RC ExpressionBinder::bind_unbound_field_expression(
 
   Table *table = nullptr;
   if (is_blank(table_name)) {
-    if (context_.table_map().size() != 1) {
+    if (context_.real_table_num() != 1) {
       LOG_INFO("cannot determine table for field: %s", field_name.c_str());
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
@@ -180,11 +175,14 @@ RC ExpressionBinder::bind_unbound_field_expression(
 
     Field      field(table, field_meta);
     FieldExpr *field_expr = new FieldExpr(field);
-    if (should_alis) {
+    if (unbound_field_expr->is_alias()) {
+      field_expr->set_name(unbound_field_expr->name());
+    } else if (should_alis) {
       field_expr->set_name(table_name + "." + field_name);
     } else {
       field_expr->set_name(field_name);
     }
+
     bound_expressions.emplace_back(field_expr);
   }
 
@@ -274,8 +272,7 @@ RC ExpressionBinder::bind_comparison_expression(
   }
 
   child_bound_expressions.clear();
-  if (comparison_expr->comp() == EXISTS_C ||
-      comparison_expr->comp() == NOT_EXISTS) {
+  if (comparison_expr->comp() == EXISTS_C || comparison_expr->comp() == NOT_EXISTS) {
     if (left_expr->type() != ExprType::VALUE_LIST) {
       LOG_WARN("right expression should be null for exists or not exists");
       return RC::INVALID_ARGUMENT;
@@ -283,7 +280,6 @@ RC ExpressionBinder::bind_comparison_expression(
     bound_expressions.emplace_back(std::move(expr));
     return RC::SUCCESS;
   }
-
 
   rc = bind_expression(right_expr, child_bound_expressions);
   if (rc != RC::SUCCESS) {
@@ -300,7 +296,7 @@ RC ExpressionBinder::bind_comparison_expression(
     right_expr.reset(right.release());
   }
 
-  if (comparison_expr->comp() == IN_OP || comparison_expr->comp() == NOT_IN ) {
+  if (comparison_expr->comp() == IN_OP || comparison_expr->comp() == NOT_IN) {
     if (right_expr->type() != ExprType::VALUE_LIST) {
       return RC::INVALID_ARGUMENT;
     }
