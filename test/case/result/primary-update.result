@@ -79,43 +79,31 @@ ID | T_NAME | COL1 | COL2
 10. UPDATE WITH INVALID VALUE
 UPDATE Update_table_1 SET col1='N01' WHERE id=1;
 FAILURE
-UPDATE Update_select_t2 SET t_name=128,col1=822.65 WHERE id=9;
-UPDATE Update_select_t2 SET t_name=(select Update_select_t1.col1 from Update_select_t1 where Update_select_t1.id=3),col1=(select min(Update_select_t1.col1) from Update_select_t1) where id=8;
+UPDATE Update_select_t2 SET col1=(select max(Update_select_t1.col2) from Update_select_t1),col2=(select max(Update_select_t1.col1) from Update_select_t1) where id=7;
 SELECT * FROM Update_select_t2;
-  6 | QKC3 | 4 | 2
-  6 | X28IYJ | 4 | 2
-  7 | V0MB58OQ25 | 4 | 2
-- 9 | 128 | 823 | 2
-- 9 | 128 | 823 | 2
-- 9 | 128 | 823 | 2
-+ 9 |  | 0 | 2
-+ 9 |  | 0 | 2
-+ 9 |  | 0 | 2
+UPDATE Update_select_t2 SET col1=(select Update_select_t1.col1 from Update_select_t1 where Update_select_t1.id=7),col2=(select Update_select_t1.col2 from Update_select_t1 where Update_select_t1.id=4) where id=8;
+- FAILURE
++ SUCCESS
 -- below are some requests executed before(partial) --
 -- init data
 CREATE TABLE Update_select_t1(id int, t_name char(10), col1 int, col2 int);
 CREATE TABLE Update_select_t2(id int, t_name char(10), col1 int, col2 int);
-insert into Update_select_t1 VALUES (4, '18XU', 6, 3);
-insert into Update_select_t1 VALUES (8, 'TN', 1, 1);
-insert into Update_select_t1 VALUES (8, 'HU', 7, 5);
+insert into Update_select_t1 VALUES (9, 'LX', 7, 4);
+insert into Update_select_t1 VALUES (3, 'WEWGUOPV', 7, 5);
+insert into Update_select_t1 VALUES (9, '24VYGLB', 6, 3);
 ...
 -- update a row
-UPDATE Update_select_t1 SET t_name='K0BPZUI', col2=3 WHERE id=5;
+UPDATE Update_select_t1 SET t_name='LSHS6RMQ', col2=3 WHERE id=7;
 SELECT * FROM Update_select_t1;
-UPDATE Update_select_t1 SET col1=2, col2=(select Update_select_t2.col2 from Update_select_t2 where Update_select_t2.id=1) WHERE id=5;
+UPDATE Update_select_t1 SET col1=2, col2=(select Update_select_t2.col2 from Update_select_t2 where Update_select_t2.id=1) WHERE id=4;
 SELECT * FROM Update_select_t1;
 -- update rows
-UPDATE Update_select_t1 SET col1=9, col2=6 WHERE col2=4;
+UPDATE Update_select_t1 SET col1=7, col2=8 WHERE col2=4;
 SELECT * FROM Update_select_t1;
 -- update without condition
 UPDATE Update_select_t2 SET t_name=(select Update_select_t1.t_name from Update_select_t1 where Update_select_t1.id=6);
 SELECT * FROM Update_select_t2;
-UPDATE Update_select_t2 SET col1=4,col2=2;
+UPDATE Update_select_t2 SET col1=8,col2=1;
 SELECT * FROM Update_select_t2;
 -- update in vain
-UPDATE Update_select_t2 SET t_name='CXIEH',col1=275 where col1=102;
--- aggregation
-UPDATE Update_select_t2 SET col1=(select max(Update_select_t1.col2) from Update_select_t1),col2=(select max(Update_select_t1.col1) from Update_select_t1) where id=8;
-SELECT * FROM Update_select_t2;
-UPDATE Update_select_t2 SET col1=(select Update_select_t1.col1 from Update_select_t1 where Update_select_t1.id=6),col2=(select Update_select_t1.col2 from Update_select_t1 where Update_select_t1.id=6) where id=8;
-SELECT * FROM Update_select_t2;
+UPDATE Update_select_t2 SET t_name='YPHQDT6HN',col1=137 where col1=109;

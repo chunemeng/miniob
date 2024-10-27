@@ -23,7 +23,6 @@ RC UpdatePhysicalOperator::open(Trx *trx)
 
   // Collect records before updating
   while (OB_SUCC(rc = child->next())) {
-    LOG_INFO("get next record %d", child->type());
     Tuple *tuple = child->current_tuple();
     if (nullptr == tuple) {
       LOG_WARN("failed to get current record: %s", strrc(rc));

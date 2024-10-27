@@ -217,9 +217,11 @@ public:
 
   RC get_value(const Tuple &tuple, Value &value) const override
   {
-    if (value_list_.size() != 1) {
+    if (value_list_.empty()) {
       value.set_null();
       return RC::SUCCESS;
+    } else if (value_list_.size() > 1) {
+      return RC::INTERNAL;
     }
     value = value_list_[0];
     return RC::SUCCESS;
@@ -229,9 +231,11 @@ public:
 
   RC try_get_value(Value &value) const override
   {
-    if (value_list_.size() != 1) {
+    if (value_list_.empty()) {
       value.set_null();
       return RC::SUCCESS;
+    } else if (value_list_.size() > 1) {
+      return RC::INTERNAL;
     }
     value = value_list_[0];
     return RC::SUCCESS;
