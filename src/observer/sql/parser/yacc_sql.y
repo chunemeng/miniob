@@ -1068,14 +1068,12 @@ condition_list:
       tmp.emplace_back($1);
       tmp.emplace_back($3);
       $$ = new ConjunctionExpr(ConjunctionExpr::Type::AND,tmp);
-      delete $1;
     }
     | condition OR condition_list {
       std::vector<std::unique_ptr<Expression>> tmp;
       tmp.emplace_back($1);
       tmp.emplace_back($3);
       $$ = new ConjunctionExpr(ConjunctionExpr::Type::OR, tmp);
-      delete $1;
     }
 
     ;
