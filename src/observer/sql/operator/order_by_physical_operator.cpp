@@ -72,7 +72,7 @@ RC OrderByPhysicalOperator::open(Trx *trx)
             if (right.attr_type() == AttrType::NULLS) {
               continue;
             }
-            return false;
+            return true;
           }
           if (right.attr_type() == AttrType::NULLS) {
             return false;
