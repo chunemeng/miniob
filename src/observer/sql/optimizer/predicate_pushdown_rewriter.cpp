@@ -66,7 +66,6 @@ RC push_predicate_to_child(std::unordered_map<std::string, std::unique_ptr<Expre
       if (pushdown_join_exprs.empty()) {
         continue;
       }
-      LOG_INFO("current %p", current);
       auto &pushdown_join_predicate = current->expressions();
       auto  lower_bound             = pushdown_join_exprs.lower_bound({name, ""});
       auto  it                      = lower_bound;

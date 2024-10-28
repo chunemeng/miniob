@@ -738,6 +738,7 @@ RC SubQueryExpr::create_select(BinderContext &binder_context, bool should_one)
   }
 
 
+  // NOTE: REWRITE 可能导致把子查询中来自外部的字段替换成推下
   bool change_made = false;
   do {
     change_made = false;

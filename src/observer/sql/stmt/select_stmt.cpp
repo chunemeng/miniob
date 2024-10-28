@@ -83,6 +83,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     }
 
     binder_context.add_table(table_name_r.relation_name, table);
+    LOG_INFO("table_name_r.attribute_name %s", table_name_r.attribute_name.c_str());
     if (!table_name_r.attribute_name.empty() &&
         !binder_context.add_alias(table_name_r.attribute_name, table_name_r.relation_name)) {
       LOG_WARN("alias name already exists. alias=%s, table_name=%s", table_name_r.attribute_name.c_str(), table_name_r.relation_name.c_str());
@@ -101,6 +102,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
       return rc;
     }
   }
+  LOG_INFO("bound_expressions size main %d", bound_expressions.size());
 
   vector<unique_ptr<Expression>> group_by_expressions;
   for (unique_ptr<Expression> &expression : select_sql.group_by) {
@@ -172,6 +174,7 @@ RC SelectStmt::create(BinderContext &binder_context, SelectSqlNode &select_sql, 
       return RC::SCHEMA_ALIAS_NAME_REPEAT;
     }
   }
+
   bool should_alis = !select_sql.inner_joins.empty();
 
   for (auto &node : select_sql.inner_joins) {
@@ -210,6 +213,7 @@ RC SelectStmt::create(BinderContext &binder_context, SelectSqlNode &select_sql, 
       return rc;
     }
   }
+  LOG_INFO("bound_expressions size %d", bound_expressions.size());
 
   vector<unique_ptr<Expression>> group_by_expressions;
   for (unique_ptr<Expression> &expression : select_sql.group_by) {

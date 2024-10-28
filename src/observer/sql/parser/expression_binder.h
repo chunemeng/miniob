@@ -24,7 +24,7 @@ public:
   BinderContext()          = default;
   virtual ~BinderContext() = default;
 
-  explicit BinderContext(const BinderContext &b)
+  BinderContext(const BinderContext &b)
   {
     alias_map_ = b.alias_map_;
     db_        = b.db_;
@@ -33,7 +33,7 @@ public:
   void add_table(const std::string &name, Table *table)
   {
     table_map_.emplace(name, table);
-    add_alias(name, name);
+    add_same_alias(name, name);
     table_ordered_.emplace_back(table);
   }
 
@@ -42,7 +42,13 @@ public:
   bool add_alias(const std::string &alias, const std::string &table_name)
   {
     auto iter = alias_map_.emplace(alias, table_name);
+    alias_back_map_.emplace(table_name, alias);
     return iter.second;
+  }
+
+  void add_same_alias(const std::string &alias, const std::string &table_name)
+  {
+    alias_map_.emplace(alias, table_name);
   }
 
   RC get_alias(const std::string &alias, std::string &table_name) const
@@ -55,6 +61,21 @@ public:
     return RC::SUCCESS;
   }
 
+  std::string get_alias_back(const std::string &table_name) const
+  {
+    auto iter = alias_back_map_.find(table_name);
+    if (iter == alias_back_map_.end()) {
+      return table_name;
+    }
+    return iter->second;
+  }
+
+  void add_table(Table *table)
+  {
+    table_map_.emplace(table->name(), table);
+    table_ordered_.emplace_back(table);
+  }
+
   Table *find_table(const std::string &table_name) const;
 
   std::unordered_map<std::string, Table *> &table_map() { return table_map_; }
@@ -62,9 +83,12 @@ public:
   Db                                       *get_db() const { return db_; }
 
 private:
-  Db                                          *db_             = nullptr;
+  Db                                          *db_ = nullptr;
   std::unordered_map<std::string, Table *>     table_map_;
   std::unordered_map<std::string, std::string> alias_map_;
+
+  // NOTE: TO PRINT
+  std::unordered_map<std::string, std::string> alias_back_map_;  // use for alias
   // use for output the table in order
   std::vector<Table *> table_ordered_;
 };

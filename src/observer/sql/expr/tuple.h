@@ -249,7 +249,7 @@ public:
       const FieldExpr *field_expr = speces_[i];
       const Field     &field      = field_expr->field();
       if (field_name == field.field_name()) {
-        return cell_at(i, cell);
+        return cell_at(static_cast<int>(i), cell);
       }
     }
     return RC::NOTFOUND;

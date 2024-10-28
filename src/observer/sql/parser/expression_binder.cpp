@@ -33,15 +33,18 @@ Table *BinderContext::find_table(const string &table_name) const
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-static void wildcard_fields(Table *table, vector<unique_ptr<Expression>> &expressions, bool should_alis)
+static void wildcard_fields(
+    Table *table, vector<unique_ptr<Expression>> &expressions, bool should_alis, const std::string &table_name)
 {
   const TableMeta &table_meta = table->table_meta();
   const int        field_num  = table_meta.field_num();
   for (int i = table_meta.sys_field_num(); i < field_num; i++) {
     Field      field(table, table_meta.field(i));
     FieldExpr *field_expr = new FieldExpr(field);
+
+    // NOTE: USE STAR WILL NO FIELD ALIAS
     if (should_alis) {
-      field_expr->set_name(field.table_name() + "." + field.field_name());
+      field_expr->set_name(table_name + "." + field.field_name());
     } else {
       field_expr->set_name(field.field_name());
     }
@@ -130,13 +133,15 @@ RC ExpressionBinder::bind_star_expression(
       LOG_INFO("no such table in from list: %s", table_name.c_str());
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
-    wildcard_fields(table, bound_expressions, should_alis);
+    std::string alias = context_.get_alias_back(table_name);
+    wildcard_fields(table, bound_expressions, should_alis, table_name);
   } else {
     auto &all_tables = context_.table_ordered();
-    // don't change it to auto, because it may lose const & in std::string!!!
-
+    LOG_INFO("all tables size %d", all_tables.size());
     for (auto table : all_tables) {
-      wildcard_fields(table, bound_expressions, should_alis);
+      std::string alias = context_.get_alias_back(table->table_meta().name_str());
+      LOG_INFO("table name %s", table->table_meta().name_str().c_str());
+      wildcard_fields(table, bound_expressions, should_alis, alias);
     }
   }
 
@@ -152,7 +157,7 @@ RC ExpressionBinder::bind_unbound_field_expression(
 
   auto unbound_field_expr = static_cast<UnboundFieldExpr *>(expr.get());
 
-  const auto &table_name = unbound_field_expr->table_name();
+  auto        table_name = unbound_field_expr->table_name();
   const auto &field_name = unbound_field_expr->field_name();
 
   Table *table = nullptr;
@@ -166,13 +171,25 @@ RC ExpressionBinder::bind_unbound_field_expression(
   } else {
     table = context_.find_table(table_name);
     if (nullptr == table) {
-      LOG_INFO("no such table in from list: %s", table_name.c_str());
-      return RC::SCHEMA_TABLE_NOT_EXIST;
+      RC          rc = RC::SCHEMA_TABLE_NOT_EXIST;
+      std::string tmp_table;
+      if ((rc = context_.get_alias(table_name, tmp_table)) != RC::SUCCESS) {
+        return rc;
+      }
+      table_name = std::move(tmp_table);
+      Db *db     = context_.get_db();
+      table      = db->find_table(table_name);
+      if (nullptr == table) {
+        LOG_INFO("no such table in from list: %s", table_name.c_str());
+        return RC::SCHEMA_TABLE_NOT_EXIST;
+      }
+      context_.add_table(table);
     }
   }
 
+  std::string alias = context_.get_alias_back(table_name);
   if (field_name == "*") {
-    wildcard_fields(table, bound_expressions, should_alis);
+    wildcard_fields(table, bound_expressions, should_alis, alias);
   } else {
     const FieldMeta *field_meta = table->table_meta().field(field_name.c_str());
     if (nullptr == field_meta) {
@@ -182,6 +199,7 @@ RC ExpressionBinder::bind_unbound_field_expression(
 
     Field      field(table, field_meta);
     FieldExpr *field_expr = new FieldExpr(field);
+
     if (unbound_field_expr->is_alias()) {
       field_expr->set_name(unbound_field_expr->name());
     } else if (should_alis) {
@@ -547,8 +565,8 @@ RC ExpressionBinder::bind_subquery_expression(
   if (nullptr == expr) {
     return RC::SUCCESS;
   }
-  BinderContext binder_context(context_);
 
+  BinderContext binder_context(context_);
 
   auto subquery_expr = static_cast<SubQueryExpr *>(expr.get());
   RC   rc            = subquery_expr->create_select(binder_context);
