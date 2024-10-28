@@ -65,11 +65,10 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   }
   bool should_alis = !select_sql.inner_joins.empty();
 
+  std::vector<std::unique_ptr<Expression>> conditions;
+
   for (auto &node : select_sql.inner_joins) {
-    std::vector<std::unique_ptr<Expression>> conditions;
-    conditions.emplace_back(select_sql.conditions);
     conditions.emplace_back(node.conditions);
-    select_sql.conditions = new ConjunctionExpr(ConjunctionExpr::Type::AND, conditions);
 
     const auto &table_name_r = node.table_name;
     if (table_name_r.relation_name.empty()) {
@@ -90,6 +89,13 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
       LOG_WARN("alias name already exists. alias=%s, table_name=%s", table_name_r.attribute_name.c_str(), table_name_r.relation_name.c_str());
       return RC::SCHEMA_ALIAS_NAME_REPEAT;
     }
+  }
+
+  if (!conditions.empty()) {
+    if (select_sql.conditions != nullptr) {
+      conditions.emplace_back(select_sql.conditions);
+    }
+    select_sql.conditions = new ConjunctionExpr(ConjunctionExpr::Type::AND, conditions);
   }
 
   // collect query fields in `select` statement
@@ -124,16 +130,14 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
 
   // create filter statement in `where` statement
   FilterStmt *filter_stmt = nullptr;
-  RC          rc          = FilterStmt::create(
-      expression_binder, select_sql.conditions, filter_stmt);
+  RC          rc          = FilterStmt::create(expression_binder, select_sql.conditions, filter_stmt);
   if (rc != RC::SUCCESS) {
     LOG_WARN("cannot construct filter stmt");
     return rc;
   }
 
   FilterStmt *having_stmt = nullptr;
-  rc                      = FilterStmt::create(
-      expression_binder, select_sql.having_cond, having_stmt);
+  rc                      = FilterStmt::create(expression_binder, select_sql.having_cond, having_stmt);
   if (rc != RC::SUCCESS) {
     LOG_WARN("cannot construct having stmt");
     return rc;
@@ -186,13 +190,11 @@ RC SelectStmt::create(BinderContext &binder_context, SelectSqlNode &select_sql, 
     }
   }
 
-  bool should_alis = !select_sql.inner_joins.empty();
+  bool                                     should_alis = !select_sql.inner_joins.empty();
+  std::vector<std::unique_ptr<Expression>> conditions;
 
   for (auto &node : select_sql.inner_joins) {
-    std::vector<std::unique_ptr<Expression>> conditions;
-    conditions.emplace_back(select_sql.conditions);
     conditions.emplace_back(node.conditions);
-    select_sql.conditions = new ConjunctionExpr(ConjunctionExpr::Type::AND, conditions);
 
     const auto &table_name_r = node.table_name;
     if (table_name_r.relation_name.empty()) {
@@ -216,6 +218,13 @@ RC SelectStmt::create(BinderContext &binder_context, SelectSqlNode &select_sql, 
       }
       binder_context.add_alias_subquery(table_name_r.attribute_name, table_name_r.relation_name);
     }
+  }
+
+  if (!conditions.empty()) {
+    if (select_sql.conditions != nullptr) {
+      conditions.emplace_back(select_sql.conditions);
+    }
+    select_sql.conditions = new ConjunctionExpr(ConjunctionExpr::Type::AND, conditions);
   }
 
   // collect query fields in `select` statement
