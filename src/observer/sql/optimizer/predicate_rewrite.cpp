@@ -37,6 +37,8 @@ RC PredicateRewriteRule::rewrite(std::unique_ptr<LogicalOperator> &oper, bool &c
     return RC::SUCCESS;
   }
 
+  LOG_INFO("predicate rewrite rule");
+
   // 如果仅有的一个子节点是predicate
   // 并且这个子节点可以判断为恒为TRUE，那么可以省略这个子节点，并把他的子节点们（就是孙子节点）接管过来
   // 如果可以判断恒为false，那么就可以删除子节点

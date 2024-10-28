@@ -34,6 +34,7 @@ RC ConjunctionSimplificationRule::rewrite(std::unique_ptr<Expression> &expr, boo
 
   change_made                                                = false;
   auto                                      conjunction_expr = static_cast<ConjunctionExpr *>(expr.get());
+  LOG_INFO("conjunction expression rewrite rule");
 
   std::vector<std::unique_ptr<Expression>> &child_exprs      = conjunction_expr->children();
 
@@ -48,13 +49,14 @@ RC ConjunctionSimplificationRule::rewrite(std::unique_ptr<Expression> &expr, boo
       ++iter;
       continue;
     }
+    LOG_INFO("conjunction expression has a child with constant value: %d", constant_value);
 
     if (conjunction_expr->conjunction_type() == ConjunctionExpr::Type::AND) {
       if (constant_value == true) {
         child_exprs.erase(iter);
       } else {
         // always be false
-        std::unique_ptr<Expression> child_expr = std::move(child_exprs.front());
+        std::unique_ptr<Expression> child_expr = std::move(*iter);
         child_exprs.clear();
         expr = std::move(child_expr);
         return rc;
@@ -63,7 +65,7 @@ RC ConjunctionSimplificationRule::rewrite(std::unique_ptr<Expression> &expr, boo
       // conjunction_type == OR
       if (constant_value == true) {
         // always be true
-        std::unique_ptr<Expression> child_expr = std::move(child_exprs.front());
+        std::unique_ptr<Expression> child_expr = std::move(*iter);
         child_exprs.clear();
         expr = std::move(child_expr);
         return rc;

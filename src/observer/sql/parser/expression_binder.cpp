@@ -124,6 +124,11 @@ RC ExpressionBinder::bind_star_expression(
     return RC::SUCCESS;
   }
 
+  if (!is_blank(expr->get_name())) {
+    LOG_INFO("invalid star expression: %s", expr->name());
+    return RC::INVALID_ARGUMENT;
+  }
+
   auto star_expr = static_cast<StarExpr *>(expr.get());
 
   const auto &table_name = star_expr->table_name();

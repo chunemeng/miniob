@@ -112,6 +112,10 @@ public:
    * @brief 表达式的名字，比如是字段名称，或者用户在执行SQL语句时输入的内容
    */
   virtual const char *name() const { return name_.c_str(); }
+
+  const std::string &get_name() const { return name_; }
+
+
   virtual void        set_name(const std::string &name) { name_ = name; }
 
   /**
@@ -135,7 +139,7 @@ protected:
   int pos_ = -1;
 
 private:
-  std::string name_;
+  std::string name_{};
 };
 
 class OrderByExpr : public Expression
@@ -320,8 +324,6 @@ public:
   }
 
   const std::vector<Value> &value_list() const { return value_list_; }
-
-  const char *name() const override { return "ValueListExpr"; }
 
 private:
   bool                                     is_init_ = false;
