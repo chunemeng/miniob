@@ -832,6 +832,10 @@ expression:
        $$ = new ValueListExpr(std::move(*$2));
        delete $2;
     }
+    | ID DOT '*' {
+      $$ = new StarExpr($1);
+      free($1);
+    }
     | '*' {
       $$ = new StarExpr();
     }
