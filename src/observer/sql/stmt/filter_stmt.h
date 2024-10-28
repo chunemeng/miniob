@@ -32,17 +32,17 @@ class ExpressionBinder;
 class FilterStmt
 {
 public:
-  FilterStmt() = default;
-  virtual ~FilterStmt();
+  FilterStmt()          = default;
+  virtual ~FilterStmt() = default;
 
 public:
-  std::vector<unique_ptr<Expression>> &filter_units() { return filter_units_; }
+  std::unique_ptr<Expression> &filter_units() { return filter_units_; }
 
 public:
-  static RC create(Table *default_table, const ConditionSqlNode *conditions, int condition_num, FilterStmt *&stmt);
+  static RC create(Table *default_table, Expression *expr, FilterStmt *&stmt);
 
-  static RC create(ExpressionBinder &binder, const ConditionSqlNode *conditions, int condition_num, FilterStmt *&stmt);
+  static RC create(ExpressionBinder &binder, Expression *expr, FilterStmt *&stmt);
 
 private:
-  std::vector<std::unique_ptr<Expression>> filter_units_;  // 默认当前都是AND关系
+  std::unique_ptr<Expression> filter_units_;  // 默认当前都是AND关系
 };

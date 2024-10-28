@@ -98,8 +98,8 @@ struct OLD_ConditionNode
 
 struct InnerJoinSqlNode
 {
-  RelAttrSqlNode                table_name;
-  std::vector<ConditionSqlNode> conditions;
+  RelAttrSqlNode table_name;
+  Expression    *conditions = nullptr;
 };
 
 struct OrderBySqlNode
@@ -122,13 +122,13 @@ struct OrderBySqlNode
 
 struct SelectSqlNode
 {
-  std::vector<std::unique_ptr<Expression>> expressions;  ///< 查询的表达式
-  std::vector<RelAttrSqlNode>              relations;    ///< 查询的表
-  std::vector<ConditionSqlNode>            conditions;   ///< 查询条件，使用AND串联起来多个条件
-  std::vector<ConditionSqlNode>            having_cond;  ///< having clause
-  std::vector<InnerJoinSqlNode>            inner_joins;  ///< inner join
-  std::vector<std::unique_ptr<Expression>> order_bys;    ///< order by clause
-  std::vector<std::unique_ptr<Expression>> group_by;     ///< group by clause
+  std::vector<std::unique_ptr<Expression>> expressions;            ///< 查询的表达式
+  std::vector<RelAttrSqlNode>              relations;              ///< 查询的表
+  Expression                              *conditions  = nullptr;  ///< 查询条件，使用AND串联起来多个条件
+  Expression                              *having_cond = nullptr;  ///< having clause
+  std::vector<InnerJoinSqlNode>            inner_joins;            ///< inner join
+  std::vector<std::unique_ptr<Expression>> order_bys;              ///< order by clause
+  std::vector<std::unique_ptr<Expression>> group_by;               ///< group by clause
 };
 
 /**
@@ -157,8 +157,8 @@ struct InsertSqlNode
  */
 struct DeleteSqlNode
 {
-  std::string                   relation_name;  ///< Relation to delete from
-  std::vector<ConditionSqlNode> conditions;
+  std::string relation_name;  ///< Relation to delete from
+  Expression *conditions = nullptr;
 };
 
 /**
@@ -168,7 +168,7 @@ struct DeleteSqlNode
 struct UpdateSqlNode
 {
   std::string                              relation_name;  ///< Relation to update
-  std::vector<ConditionSqlNode>            conditions;
+  Expression                              *conditions = nullptr;
   std::vector<std::unique_ptr<Expression>> expressions;  ///< 更新的表达式
 };
 

@@ -93,7 +93,7 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
   ASSERT(expr.size() == fields.size(), "expr size should be equal to fields size");
 
   FilterStmt *filter_stmt = nullptr;
-  rc = FilterStmt::create(table, update.conditions.data(), static_cast<int>(update.conditions.size()), filter_stmt);
+  rc = FilterStmt::create(table, update.conditions, filter_stmt);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to create filter statement. rc=%d:%s", rc, strrc(rc));
     return rc;

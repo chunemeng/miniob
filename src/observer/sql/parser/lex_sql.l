@@ -104,6 +104,7 @@ WHERE                                   RETURN_TOKEN(WHERE);
 NOT                                     RETURN_TOKEN(NOT);
 LIKE                                    RETURN_TOKEN(LIKE);
 AND                                     RETURN_TOKEN(AND);
+OR                                      RETURN_TOKEN(OR);
 INSERT                                  RETURN_TOKEN(INSERT);
 IS                                      RETURN_TOKEN(IS);
 INTO                                    RETURN_TOKEN(INTO);

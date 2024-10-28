@@ -160,7 +160,6 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
     last_oper = &predicate_oper_having;
   }
 
-
   std::unique_ptr<LogicalOperator> order_by_oper;
   if (!select_stmt->order_by().empty()) {
     order_by_oper = std::make_unique<OrderByLogicalOperator>(select_stmt->order_by());
@@ -182,19 +181,13 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
 
 RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<LogicalOperator> &logical_operator)
 {
-  RC                                        rc = RC::SUCCESS;
-  std::vector<unique_ptr<Expression>>       cmp_exprs;
-  std::vector<std::unique_ptr<Expression>> &filter_units = filter_stmt->filter_units();
-  cmp_exprs.reserve(filter_units.size());
-
-  for (auto &filter_unit : filter_units) {
-    cmp_exprs.emplace_back(std::move(filter_unit));
-  }
+  RC                           rc           = RC::SUCCESS;
+  std::unique_ptr<Expression> &filter_units = filter_stmt->filter_units();
 
   unique_ptr<PredicateLogicalOperator> predicate_oper;
-  if (!cmp_exprs.empty()) {
-    unique_ptr<ConjunctionExpr> conjunction_expr(new ConjunctionExpr(ConjunctionExpr::Type::AND, cmp_exprs));
-    predicate_oper = unique_ptr<PredicateLogicalOperator>(new PredicateLogicalOperator(std::move(conjunction_expr)));
+
+  if (filter_units != nullptr) {
+    predicate_oper = std::make_unique<PredicateLogicalOperator>(std::move(filter_units));
   }
 
   logical_operator = std::move(predicate_oper);
@@ -348,20 +341,18 @@ RC LogicalPlanGenerator::create_group_by_plan(SelectStmt *select_stmt, unique_pt
     collector(expression);
   }
 
-  if (select_stmt->having_stmt() != nullptr) {
     auto &having_stmt = select_stmt->having_stmt()->filter_units();
-    for (auto &filter_unit : having_stmt) {
-      collector(filter_unit);
+
+    if (having_stmt != nullptr) {
+      bind_group_by_expr(having_stmt);
+
+      find_unbound_column(having_stmt);
+
+      collector(having_stmt);
     }
 
-    for (auto &filter_unit : having_stmt) {
-      find_unbound_column(filter_unit);
-    }
 
-    for (auto &filter_unit : having_stmt) {
-      collector(filter_unit);
-    }
-  }
+
 
   if (group_by_expressions.empty() && aggregate_expressions.empty()) {
     // 既没有group by也没有聚合函数，不需要group by

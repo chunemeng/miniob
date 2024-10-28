@@ -19,36 +19,41 @@ See the Mulan PSL v2 for more details. */
 #include "storage/table/table.h"
 #include "sql/parser/expression_binder.h"
 
-FilterStmt::~FilterStmt() { filter_units_.clear(); }
-
-RC FilterStmt::create(Table *default_table, const ConditionSqlNode *conditions, int condition_num, FilterStmt *&stmt)
+RC FilterStmt::create(Table *default_table, Expression *expr, FilterStmt *&stmt)
 {
   BinderContext binder_context;
   binder_context.add_table(default_table->name(), default_table);
   ExpressionBinder binder(binder_context);
-  return create(binder, conditions, condition_num, stmt);
+  return create(binder, expr, stmt);
 }
 
-RC FilterStmt::create(
-    ExpressionBinder &binder, const ConditionSqlNode *conditions, int condition_num, FilterStmt *&stmt)
+RC FilterStmt::create(ExpressionBinder &binder, Expression *expr, FilterStmt *&stmt)
 {
   RC rc = RC::SUCCESS;
   stmt  = nullptr;
 
   FilterStmt *tmp_stmt = new FilterStmt();
 
-  std::vector<std::unique_ptr<Expression>> units;
-  for (int i = 0; i < condition_num; i++) {
-    std::unique_ptr<Expression> filter_unit(conditions[i].condition);
-    rc = binder.bind_expression(filter_unit, units);
-    if (rc != RC::SUCCESS) {
-      delete tmp_stmt;
-      LOG_WARN("failed to create filter unit. condition index=%d", i);
-      return rc;
-    }
+  std::unique_ptr<Expression> filter_unit(expr);
+  if (nullptr == filter_unit) {
+    stmt = tmp_stmt;
+    return RC::SUCCESS;
   }
 
-  tmp_stmt->filter_units_ = std::move(units);
+  std::vector<std::unique_ptr<Expression>> units;
+  rc = binder.bind_expression(filter_unit, units);
+  if (rc != RC::SUCCESS) {
+    delete tmp_stmt;
+    LOG_WARN("failed to create filter unit. condition index=%d");
+    return rc;
+  }
+  if (units.empty()) {
+    delete tmp_stmt;
+    LOG_WARN("empty filter unit");
+    return RC::INVALID_ARGUMENT;
+  }
+
+  tmp_stmt->filter_units_ = std::move(units[0]);
   stmt                    = tmp_stmt;
   return rc;
 }

@@ -167,6 +167,7 @@ UnboundAggregateExpr *create_aggregate_expression(AggrType aggregate_name,
         IS
         LIKE
         AND
+        OR
         SET
         ON
         IN
@@ -222,7 +223,7 @@ UnboundAggregateExpr *create_aggregate_expression(AggrType aggregate_name,
 
 /** type 定义了各种解析后的结果输出的是什么类型。类型对应了 union 中的定义的成员变量名称 **/
 %type <number>              type
-%type <condition>           condition
+%type <expression>          condition
 %type <vec_list>            v_list
 %type <vec_list>            v_l
 %type <value>               value
@@ -245,9 +246,9 @@ UnboundAggregateExpr *create_aggregate_expression(AggrType aggregate_name,
 %type <value_list>          value_list
 %type <inner_j>             inner_join
 %type <inner_join_list>     inner_joins
-%type <condition_list>      where
-%type <condition_list>      having
-%type <condition_list>      condition_list
+%type <expression>          where
+%type <expression>          having
+%type <expression>          condition_list
 %type <string>              storage_format
 %type <rel_attr_list>       rel_list
 %type <rel_attr_list>       rel_table_list
@@ -607,8 +608,7 @@ delete_stmt:    /*  delete 语句的语法解析树*/
       $$ = new ParsedSqlNode(SCF_DELETE);
       $$->deletion.relation_name = $3;
       if ($4 != nullptr) {
-        $$->deletion.conditions.swap(*$4);
-        delete $4;
+        $$->deletion.conditions = $4;
       }
       free($3);
     }
@@ -620,8 +620,7 @@ update_stmt:      /*  update 语句的语法解析树*/
       $$->update.relation_name = $2;
       $$->update.expressions = std::move(*$4);
       if ($5 != nullptr) {
-        $$->update.conditions.swap(*$5);
-        delete $5;
+        $$->update.conditions  = $5 ;
       }
       delete $4;
       free($2);
@@ -699,8 +698,7 @@ select_stmt:        /*  select 语句的语法解析树*/
       }
 
       if ($6 != nullptr) {
-        $$->selection.conditions.swap(*$6);
-        delete $6;
+        $$->selection.conditions = $6;
       }
 
       if ($7 != nullptr) {
@@ -709,8 +707,7 @@ select_stmt:        /*  select 语句的语法解析树*/
       }
 
       if ($8 != nullptr) {
-        $$->selection.having_cond.swap(*$8);
-        delete $8;
+        $$->selection.having_cond = $8;
       }
 
       if ($9 != nullptr) {
@@ -915,8 +912,7 @@ inner_join:
         node.relation_name = $3;
       }
         $$->table_name = node;
-      $$->conditions.swap(*$6);
-      delete $6;
+      $$->conditions = $6;
       free($3);
     }
     | INNER JOIN ID as_opt {
@@ -1065,15 +1061,23 @@ condition_list:
       $$ = nullptr;
     }
     | condition {
-      $$ = new std::vector<ConditionSqlNode>;
-      $$->emplace_back(*$1);
-      delete $1;
+      $$ = $1;
     }
     | condition AND condition_list {
-      $$ = $3;
-      $$->emplace_back(*$1);
+      std::vector<std::unique_ptr<Expression>> tmp;
+      tmp.emplace_back($1);
+      tmp.emplace_back($3);
+      $$ = new ConjunctionExpr(ConjunctionExpr::Type::AND,tmp);
       delete $1;
     }
+    | condition OR condition_list {
+      std::vector<std::unique_ptr<Expression>> tmp;
+      tmp.emplace_back($1);
+      tmp.emplace_back($3);
+      $$ = new ConjunctionExpr(ConjunctionExpr::Type::OR, tmp);
+      delete $1;
+    }
+
     ;
 eq_expr:
     expression EQ expression
@@ -1085,23 +1089,19 @@ eq_expr:
 condition:
     expression comp_op expression
     {
-      $$ = new ConditionSqlNode;
-      $$->condition = create_comparison_expression($2, $1, $3, sql_string, &@$);
+      $$ = create_comparison_expression($2, $1, $3, sql_string, &@$);
     }
     | EXISTS expression
     {
-      $$ = new ConditionSqlNode;
-      $$->condition = create_comparison_expression(EXISTS_C, $2, nullptr, sql_string, &@$);
+      $$ = create_comparison_expression(EXISTS_C, $2, nullptr, sql_string, &@$);
     }
     | NOT EXISTS expression
     {
-      $$ = new ConditionSqlNode;
-      $$->condition = create_comparison_expression(NOT_EXISTS, $3, nullptr, sql_string, &@$);
+      $$ = create_comparison_expression(NOT_EXISTS, $3, nullptr, sql_string, &@$);
     }
     | eq_expr
     {
-      $$ = new ConditionSqlNode;
-      $$->condition = $1;
+      $$ = $1;
     }
     ;
 

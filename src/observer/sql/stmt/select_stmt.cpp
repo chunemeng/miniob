@@ -66,9 +66,10 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   bool should_alis = !select_sql.inner_joins.empty();
 
   for (auto &node : select_sql.inner_joins) {
-    for (auto &cond : node.conditions) {
-      select_sql.conditions.emplace_back(cond);
-    }
+    std::vector<std::unique_ptr<Expression>> conditions;
+    conditions.emplace_back(select_sql.conditions);
+    conditions.emplace_back(node.conditions);
+    select_sql.conditions = new ConjunctionExpr(ConjunctionExpr::Type::AND, conditions);
 
     const auto &table_name_r = node.table_name;
     if (table_name_r.relation_name.empty()) {
@@ -124,7 +125,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   // create filter statement in `where` statement
   FilterStmt *filter_stmt = nullptr;
   RC          rc          = FilterStmt::create(
-      expression_binder, select_sql.conditions.data(), static_cast<int>(select_sql.conditions.size()), filter_stmt);
+      expression_binder, select_sql.conditions, filter_stmt);
   if (rc != RC::SUCCESS) {
     LOG_WARN("cannot construct filter stmt");
     return rc;
@@ -132,7 +133,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
 
   FilterStmt *having_stmt = nullptr;
   rc                      = FilterStmt::create(
-      expression_binder, select_sql.having_cond.data(), static_cast<int>(select_sql.having_cond.size()), having_stmt);
+      expression_binder, select_sql.having_cond, having_stmt);
   if (rc != RC::SUCCESS) {
     LOG_WARN("cannot construct having stmt");
     return rc;
@@ -188,9 +189,10 @@ RC SelectStmt::create(BinderContext &binder_context, SelectSqlNode &select_sql, 
   bool should_alis = !select_sql.inner_joins.empty();
 
   for (auto &node : select_sql.inner_joins) {
-    for (auto &cond : node.conditions) {
-      select_sql.conditions.emplace_back(cond);
-    }
+    std::vector<std::unique_ptr<Expression>> conditions;
+    conditions.emplace_back(select_sql.conditions);
+    conditions.emplace_back(node.conditions);
+    select_sql.conditions = new ConjunctionExpr(ConjunctionExpr::Type::AND, conditions);
 
     const auto &table_name_r = node.table_name;
     if (table_name_r.relation_name.empty()) {
@@ -249,16 +251,14 @@ RC SelectStmt::create(BinderContext &binder_context, SelectSqlNode &select_sql, 
 
   // create filter statement in `where` statement
   FilterStmt *filter_stmt = nullptr;
-  RC          rc          = FilterStmt::create(
-      expression_binder, select_sql.conditions.data(), static_cast<int>(select_sql.conditions.size()), filter_stmt);
+  RC          rc          = FilterStmt::create(expression_binder, select_sql.conditions, filter_stmt);
   if (rc != RC::SUCCESS) {
     LOG_WARN("cannot construct filter stmt");
     return rc;
   }
 
   FilterStmt *having_stmt = nullptr;
-  rc                      = FilterStmt::create(
-      expression_binder, select_sql.having_cond.data(), static_cast<int>(select_sql.having_cond.size()), having_stmt);
+  rc                      = FilterStmt::create(expression_binder, select_sql.having_cond, having_stmt);
   if (rc != RC::SUCCESS) {
     LOG_WARN("cannot construct having stmt");
     return rc;
