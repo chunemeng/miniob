@@ -824,6 +824,17 @@ expression:
       $$ = ex;
       delete $1;
     }
+    | expression ID {
+        $$ = $1;
+        $$->set_name($2);
+        free($2);
+    }
+    | expression AS ID {
+        $$ = $1;
+        $$->set_name($3);
+        free($3);
+    }
+
     | LBRACE select_stmt RBRACE {
        $$ = new SubQueryExpr(std::move($2->selection));
        delete $2;
