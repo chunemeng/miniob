@@ -42,8 +42,22 @@ public:
   bool add_alias(const std::string &alias, const std::string &table_name)
   {
     auto iter = alias_map_.emplace(alias, table_name);
+    // NOTE: 如果子查询中有重名的表 不会覆盖
     alias_back_map_.emplace(table_name, alias);
     return iter.second;
+  }
+
+  void add_alias_subquery(const std::string &alias, const std::string &table_name)
+  {
+    auto iter = alias_map_.emplace(alias, table_name);
+    if (!iter.second) {
+      std::string old_table_name = iter.first->second;
+      alias_map_.erase(iter.first);
+      alias_back_map_.erase(old_table_name);
+      alias_map_.emplace(alias, table_name);
+    }
+
+    alias_back_map_.emplace(table_name, alias);
   }
 
   void add_same_alias(const std::string &alias, const std::string &table_name)

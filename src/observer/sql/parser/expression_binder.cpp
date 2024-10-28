@@ -596,6 +596,7 @@ RC ExpressionBinder::bind_valuelist_expression(
   bound_expressions.emplace_back(std::move(value_expr));
   return RC::SUCCESS;
 }
+
 RC ExpressionBinder::bind_order_by_expression(
     unique_ptr<Expression> &order_by_expr, vector<std::unique_ptr<Expression>> &bound_expressions)
 {

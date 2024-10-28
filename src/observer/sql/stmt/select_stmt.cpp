@@ -170,8 +170,12 @@ RC SelectStmt::create(BinderContext &binder_context, SelectSqlNode &select_sql, 
     binder_context.add_table(table_name.relation_name, table);
     if (!table_name.attribute_name.empty() &&
         !binder_context.add_alias(table_name.attribute_name, table_name.relation_name)) {
-      LOG_WARN("alias name already exists. alias=%s, table_name=%s", table_name.attribute_name.c_str(), table_name.relation_name.c_str());
-      return RC::SCHEMA_ALIAS_NAME_REPEAT;
+      std::string alias = binder_context.get_alias_back(table_name.attribute_name);
+      if (alias == table_name.relation_name) {
+        LOG_WARN("alias name already exists. alias=%s, table_name=%s", table_name.attribute_name.c_str(), table_name.relation_name.c_str());
+        return RC::SCHEMA_ALIAS_NAME_REPEAT;
+      }
+      binder_context.add_alias_subquery(table_name.attribute_name, table_name.relation_name);
     }
   }
 
@@ -197,8 +201,12 @@ RC SelectStmt::create(BinderContext &binder_context, SelectSqlNode &select_sql, 
     binder_context.add_table(table_name_r.relation_name, table);
     if (!table_name_r.attribute_name.empty() &&
         !binder_context.add_alias(table_name_r.attribute_name, table_name_r.relation_name)) {
-      LOG_WARN("alias name already exists. alias=%s, table_name=%s", table_name_r.attribute_name.c_str(), table_name_r.relation_name.c_str());
-      return RC::SCHEMA_ALIAS_NAME_REPEAT;
+      std::string alias = binder_context.get_alias_back(table_name_r.attribute_name);
+      if (alias == table_name_r.relation_name) {
+        LOG_WARN("alias name already exists. alias=%s, table_name=%s", table_name_r.attribute_name.c_str(), table_name_r.relation_name.c_str());
+        return RC::SCHEMA_ALIAS_NAME_REPEAT;
+      }
+      binder_context.add_alias_subquery(table_name_r.attribute_name, table_name_r.relation_name);
     }
   }
 
