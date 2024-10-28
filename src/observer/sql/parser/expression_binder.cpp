@@ -275,7 +275,7 @@ RC ExpressionBinder::bind_comparison_expression(
 
   unique_ptr<Expression> &left = child_bound_expressions[0];
   if (left.get() != left_expr.get()) {
-    left_expr.reset(left.release());
+    left_expr = std::move(left);
   }
 
   child_bound_expressions.clear();
@@ -300,7 +300,7 @@ RC ExpressionBinder::bind_comparison_expression(
 
   unique_ptr<Expression> &right = child_bound_expressions[0];
   if (right.get() != right_expr.get()) {
-    right_expr.reset(right.release());
+    right_expr = std::move(right);
   }
 
   if (comparison_expr->comp() == IN_OP || comparison_expr->comp() == NOT_IN) {
@@ -547,9 +547,11 @@ RC ExpressionBinder::bind_subquery_expression(
   if (nullptr == expr) {
     return RC::SUCCESS;
   }
+  BinderContext binder_context(context_);
+
 
   auto subquery_expr = static_cast<SubQueryExpr *>(expr.get());
-  RC   rc            = subquery_expr->create_select(context_);
+  RC   rc            = subquery_expr->create_select(binder_context);
   if (OB_FAIL(rc)) {
     return rc;
   }

@@ -29,8 +29,8 @@ RC FilterStmt::create(Table *default_table, const ConditionSqlNode *conditions, 
   return create(binder, conditions, condition_num, stmt);
 }
 
-RC FilterStmt::create(ExpressionBinder &binder, const ConditionSqlNode *conditions,
-    int condition_num, FilterStmt *&stmt)
+RC FilterStmt::create(
+    ExpressionBinder &binder, const ConditionSqlNode *conditions, int condition_num, FilterStmt *&stmt)
 {
   RC rc = RC::SUCCESS;
   stmt  = nullptr;

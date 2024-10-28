@@ -129,6 +129,8 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     return rc;
   }
 
+  LOG_INFO("filter stmt created %d", filter_stmt->filter_units().size());
+
   // everything alright
   SelectStmt *select_stmt = new SelectStmt();
 
@@ -140,8 +142,9 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   stmt = select_stmt;
   return RC::SUCCESS;
 }
-RC SelectStmt::create(BinderContext &binder_context, SelectSqlNode &select_sql, Stmt *&stmt) {
-  Db* db = binder_context.get_db();
+RC SelectStmt::create(BinderContext &binder_context, SelectSqlNode &select_sql, Stmt *&stmt)
+{
+  Db *db = binder_context.get_db();
   if (nullptr == db) {
     LOG_WARN("invalid argument. db is null");
     return RC::INVALID_ARGUMENT;

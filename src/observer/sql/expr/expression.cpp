@@ -725,6 +725,7 @@ RC SubQueryExpr::create_select(BinderContext &binder_context, bool should_one)
 
   std::unique_ptr<LogicalOperator> logical_operator;
   rc = logical_plan_generator_.create(stmt, logical_operator);
+  LOG_INFO("create logical plan");
 
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to create logical plan. rc=%s", strrc(rc));
@@ -735,6 +736,7 @@ RC SubQueryExpr::create_select(BinderContext &binder_context, bool should_one)
     LOG_WARN("logical operator is null");
     return RC::SUCCESS;
   }
+
 
   bool change_made = false;
   do {

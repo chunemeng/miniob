@@ -24,6 +24,12 @@ public:
   BinderContext()          = default;
   virtual ~BinderContext() = default;
 
+  explicit BinderContext(const BinderContext &b)
+  {
+    alias_map_ = b.alias_map_;
+    db_        = b.db_;
+  };
+
   void add_table(const std::string &name, Table *table)
   {
     table_map_.emplace(name, table);
@@ -57,7 +63,6 @@ public:
 
 private:
   Db                                          *db_             = nullptr;
-  int                                          real_table_num_ = 0;
   std::unordered_map<std::string, Table *>     table_map_;
   std::unordered_map<std::string, std::string> alias_map_;
   // use for output the table in order
@@ -78,7 +83,6 @@ public:
       bool should_alis = false);
 
 private:
-
   RC bind_subquery_expression(
       std::unique_ptr<Expression> &subquery_expr, std::vector<std::unique_ptr<Expression>> &bound_expressions);
   RC bind_star_expression(std::unique_ptr<Expression> &star_expr,
