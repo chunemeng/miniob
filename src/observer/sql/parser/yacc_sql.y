@@ -766,6 +766,10 @@ as_opt:
     {
       $$ = $2;
     }
+    | ID
+    {
+      $$ = $1;
+    }
     ;
 expression:
     expression '+' expression {
