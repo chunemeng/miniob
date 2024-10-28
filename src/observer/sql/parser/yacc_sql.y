@@ -125,6 +125,7 @@ UnboundAggregateExpr *create_aggregate_expression(AggrType aggregate_name,
         RBRACKET
         GROUP
         ORDER
+        HAVING
         UNIQUE
         TABLE
         TABLES
@@ -245,6 +246,7 @@ UnboundAggregateExpr *create_aggregate_expression(AggrType aggregate_name,
 %type <inner_j>             inner_join
 %type <inner_join_list>     inner_joins
 %type <condition_list>      where
+%type <condition_list>      having
 %type <condition_list>      condition_list
 %type <string>              storage_format
 %type <rel_attr_list>       rel_list
@@ -647,6 +649,7 @@ order_b:
       delete $1;
     }
     ;
+
 order_by:
     order_b
     {
@@ -675,13 +678,8 @@ order_by_list:
     }
     ;
 
-
-
-
-
-
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT expression_list FROM rel_table_list inner_joins where group_by order_by_list
+    SELECT expression_list FROM rel_table_list inner_joins where group_by having order_by_list
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -711,8 +709,13 @@ select_stmt:        /*  select 语句的语法解析树*/
       }
 
       if ($8 != nullptr) {
-        $$->selection.order_bys.swap(*$8);
+        $$->selection.having_cond.swap(*$8);
         delete $8;
+      }
+
+      if ($9 != nullptr) {
+        $$->selection.order_bys.swap(*$9);
+        delete $9;
       }
     }
     ;
@@ -1021,6 +1024,16 @@ rel_list:
       free($1);
     }
     ;
+having:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | HAVING condition_list {
+      $$ = $2;
+    }
+    ;
+
 
 where:
     /* empty */
@@ -1091,11 +1104,13 @@ comp_op:
     | NOT IN { $$ = NOT_IN; }
     ;
 
-// your code here
 group_by:
     /* empty */
     {
       $$ = nullptr;
+    }
+    | GROUP BY expression_list {
+      $$ = $3;
     }
     ;
 load_data_stmt:

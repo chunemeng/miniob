@@ -128,6 +128,7 @@ EXPLAIN                                 RETURN_TOKEN(EXPLAIN);
 GROUP                                   RETURN_TOKEN(GROUP);
 ORDER                                   RETURN_TOKEN(ORDER);
 BY                                      RETURN_TOKEN(BY);
+HAVING                                  RETURN_TOKEN(HAVING);
 UNIQUE                                  RETURN_TOKEN(UNIQUE);
 STORAGE                                 RETURN_TOKEN(STORAGE);
 NULLABLE                                RETURN_TOKEN(NULL_L);

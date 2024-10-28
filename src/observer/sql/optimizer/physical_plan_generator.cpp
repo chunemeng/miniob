@@ -374,8 +374,10 @@ RC PhysicalPlanGenerator::create_plan(GroupByLogicalOperator &logical_oper, std:
   vector<unique_ptr<Expression>>     &group_by_expressions = logical_oper.group_by_expressions();
   unique_ptr<GroupByPhysicalOperator> group_by_oper;
   if (group_by_expressions.empty()) {
+    LOG_INFO("use scalar group by operator");
     group_by_oper = make_unique<ScalarGroupByPhysicalOperator>(std::move(logical_oper.aggregate_expressions()));
   } else {
+    LOG_INFO("use hash group by operator");
     group_by_oper = make_unique<HashGroupByPhysicalOperator>(
         std::move(logical_oper.group_by_expressions()), std::move(logical_oper.aggregate_expressions()));
   }

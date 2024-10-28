@@ -144,6 +144,23 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
     last_oper = &group_by_oper;
   }
 
+  unique_ptr<LogicalOperator> predicate_oper_having;
+
+  rc = create_plan(select_stmt->having_stmt(), predicate_oper_having);
+  if (OB_FAIL(rc)) {
+    LOG_WARN("failed to create predicate logical plan. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  if (predicate_oper_having) {
+    if (*last_oper) {
+      predicate_oper_having->add_child(std::move(*last_oper));
+    }
+
+    last_oper = &predicate_oper_having;
+  }
+
+
   std::unique_ptr<LogicalOperator> order_by_oper;
   if (!select_stmt->order_by().empty()) {
     order_by_oper = std::make_unique<OrderByLogicalOperator>(select_stmt->order_by());
@@ -210,6 +227,7 @@ RC LogicalPlanGenerator::create_plan(DeleteStmt *delete_stmt, unique_ptr<Logical
   unique_ptr<LogicalOperator> predicate_oper;
 
   RC rc = create_plan(filter_stmt, predicate_oper);
+
   if (rc != RC::SUCCESS) {
     return rc;
   }
@@ -293,7 +311,7 @@ RC LogicalPlanGenerator::create_group_by_plan(SelectStmt *select_stmt, unique_pt
       if (expr->type() == ExprType::AGGREGATION) {
         break;
       } else if (expr->equal(*group_by)) {
-        expr->set_pos(i);
+        expr->set_pos(static_cast<int>(i));
         continue;
       } else {
         rc = ExpressionIterator::iterate_child_expr(*expr, bind_group_by_expr);
@@ -328,6 +346,21 @@ RC LogicalPlanGenerator::create_group_by_plan(SelectStmt *select_stmt, unique_pt
   // collect all aggregate expressions
   for (unique_ptr<Expression> &expression : query_expressions) {
     collector(expression);
+  }
+
+  if (select_stmt->having_stmt() != nullptr) {
+    auto &having_stmt = select_stmt->having_stmt()->filter_units();
+    for (auto &filter_unit : having_stmt) {
+      collector(filter_unit);
+    }
+
+    for (auto &filter_unit : having_stmt) {
+      find_unbound_column(filter_unit);
+    }
+
+    for (auto &filter_unit : having_stmt) {
+      collector(filter_unit);
+    }
   }
 
   if (group_by_expressions.empty() && aggregate_expressions.empty()) {

@@ -102,7 +102,13 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
       return rc;
     }
   }
-  LOG_INFO("bound_expressions size main %d", bound_expressions.size());
+
+  for (auto &node : select_sql.having_cond) {
+    if (node.condition == nullptr || node.condition->type() != ExprType::COMPARISON) {
+      LOG_WARN("invalid argument. condition is null.");
+      return RC::INVALID_ARGUMENT;
+    }
+  }
 
   vector<unique_ptr<Expression>> group_by_expressions;
   for (unique_ptr<Expression> &expression : select_sql.group_by) {
@@ -131,7 +137,13 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     return rc;
   }
 
-  LOG_INFO("filter stmt created %d", filter_stmt->filter_units().size());
+  FilterStmt *having_stmt = nullptr;
+  rc                      = FilterStmt::create(
+      expression_binder, select_sql.having_cond.data(), static_cast<int>(select_sql.having_cond.size()), having_stmt);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("cannot construct having stmt");
+    return rc;
+  }
 
   // everything alright
   SelectStmt *select_stmt = new SelectStmt();
@@ -139,6 +151,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   select_stmt->tables_.swap(binder_context.table_ordered());
   select_stmt->query_expressions_.swap(bound_expressions);
   select_stmt->filter_stmt_ = filter_stmt;
+  select_stmt->having_stmt_ = having_stmt;
   select_stmt->group_by_.swap(group_by_expressions);
   select_stmt->order_by_.swap(order_by_expressions);
   stmt = select_stmt;
