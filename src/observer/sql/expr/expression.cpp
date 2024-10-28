@@ -709,12 +709,12 @@ RC AggregateExpr::get_value(const Tuple &tuple, Value &value) const
   return tuple.find_cell(TupleCellSpec(name()), value);
 }
 
-RC SubQueryExpr::create_select(Db *db, bool should_one)
+RC SubQueryExpr::create_select(BinderContext &binder_context, bool should_one)
 {
   Stmt *stmt  = nullptr;
   should_one_ = should_one;
 
-  RC rc = SelectStmt::create(db, select_, stmt);
+  RC rc = SelectStmt::create(binder_context, select_, stmt);
   if (rc != RC::SUCCESS) {
     delete stmt;
     return rc;

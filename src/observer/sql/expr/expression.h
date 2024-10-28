@@ -214,6 +214,7 @@ private:
 };
 
 class PhysicalOperator;
+class BinderContext;
 class SubQueryExpr : public Expression
 {
 public:
@@ -227,7 +228,7 @@ public:
 
   RC try_get_value_fun(Value &value);
 
-  RC create_select(Db *db, bool should_one = true);
+  RC create_select(BinderContext & binder_context, bool should_one = true);
 
 private:
   bool                              should_one_ = true;

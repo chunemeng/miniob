@@ -549,7 +549,7 @@ RC ExpressionBinder::bind_subquery_expression(
   }
 
   auto subquery_expr = static_cast<SubQueryExpr *>(expr.get());
-  RC   rc            = subquery_expr->create_select(context_.get_db());
+  RC   rc            = subquery_expr->create_select(context_);
   if (OB_FAIL(rc)) {
     return rc;
   }

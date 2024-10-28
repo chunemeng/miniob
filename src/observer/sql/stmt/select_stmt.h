@@ -25,6 +25,7 @@ class FieldMeta;
 class FilterStmt;
 class Db;
 class Table;
+class BinderContext;
 
 /**
  * @brief 表示select语句
@@ -40,6 +41,7 @@ public:
 
 public:
   static RC create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt);
+  static RC create(BinderContext &binder_context, SelectSqlNode &select_sql, Stmt *&stmt);
 
 public:
   const std::vector<Table *> &tables() const { return tables_; }
