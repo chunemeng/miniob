@@ -467,6 +467,11 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
               return RC::INVALID_ARGUMENT;
             }
 
+            if (field->type() == AttrType::TEXTS && len > 65535) {
+              LOG_INFO("field len: %d, value len: %d", field->len(), len);
+              return RC::INVALID_ARGUMENT;
+            }
+
             int pages     = (len + BP_PAGE_DATA_SIZE - 1) / BP_PAGE_DATA_SIZE;
             int max_pages = field->len() / static_cast<int>(sizeof(int));
             if (pages >= max_pages) {
@@ -868,18 +873,25 @@ RC Table::make_record(
       if (field->type() != value.attr_type()) {
         int         len           = value.length();
         std::string tmp;
+        bool should_char = true;
         const char *v_data = value.data();
         switch (field->type()) {
           case AttrType::HIGH_DIMS:
             if (value.attr_type() == AttrType::VECTORS) {
               tmp    = value.to_string();
+              should_char = false;
               v_data = tmp.c_str();
               len    = static_cast<int>(tmp.length());
               [[fallthrough]];
             }
           case AttrType::TEXTS: {
-            if (value.attr_type() != AttrType::CHARS) {
+            if (should_char && value.attr_type() != AttrType::CHARS) {
               LOG_INFO("field type: %d, value type: %d", field->type(), value.attr_type());
+              return RC::INVALID_ARGUMENT;
+            }
+
+            if (field->type() == AttrType::TEXTS && len > 65535) {
+              LOG_INFO("field len: %d, value len: %d", field->len(), len);
               return RC::INVALID_ARGUMENT;
             }
 

@@ -210,8 +210,10 @@ public:
       return RC::SUCCESS;
     } else {
       if (field_meta->type() == AttrType::TEXTS || field_meta->type() == AttrType::HIGH_DIMS) {
-        auto  bp       = reinterpret_cast<int32_t *>(record_->data() + field_meta->offset());
-        int   len      = bp[9];
+        auto bp        = reinterpret_cast<int32_t *>(record_->data() + field_meta->offset());
+        int  max_pages = field_meta->len() / sizeof(int);
+        int  len       = bp[max_pages - 1];
+
         char *str      = new char[len + 1];
         int   page_num = (len + BP_PAGE_DATA_SIZE - 1) / BP_PAGE_DATA_SIZE;
         RC    rc       = table_->read_from_big_page(str, len, bp, page_num);

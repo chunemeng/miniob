@@ -472,7 +472,7 @@ attr_def:
       $$->type = (AttrType)$2;
       $$->name = $1;
       if ($$->type == AttrType::TEXTS) {
-        $$->length = sizeof(int) * 10;
+        $$->length = ((65535 + BP_PAGE_DATA_SIZE - 1) / BP_PAGE_DATA_SIZE + 1) * sizeof(int);
       } else {
             $$->length = 4;
       }

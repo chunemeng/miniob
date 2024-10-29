@@ -2152,7 +2152,7 @@ yyreduce:
       (yyval.attr_info)->type = (AttrType)(yyvsp[-1].number);
       (yyval.attr_info)->name = (yyvsp[-2].string);
       if ((yyval.attr_info)->type == AttrType::TEXTS) {
-        (yyval.attr_info)->length = sizeof(int) * 10;
+        (yyval.attr_info)->length = ((65535 + BP_PAGE_DATA_SIZE - 1) / BP_PAGE_DATA_SIZE + 1) * sizeof(int);
       } else {
             (yyval.attr_info)->length = 4;
       }
