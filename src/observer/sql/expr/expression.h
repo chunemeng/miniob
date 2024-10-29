@@ -230,6 +230,8 @@ public:
 
   RC get_value(const Tuple &tuple, Value &value) const override { return RC::INTERNAL; }
 
+  RC get_attr_type(std::vector<AttrInfoSqlNode> &) const;
+
   RC try_get_value_fun(Value &value);
 
   RC create_select(BinderContext & binder_context, bool should_one = true);

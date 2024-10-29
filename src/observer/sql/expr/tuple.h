@@ -201,8 +201,10 @@ public:
 
     FieldExpr       *field_expr = speces_[index];
     const FieldMeta *field_meta = field_expr->field().meta();
-    const auto       table_meta = table_->table_meta();
-    auto             null_map   = reinterpret_cast<int *>(record_->data() + table_meta.null_field_offset());
+    const auto  &     table_meta = table_->table_meta();
+
+    auto             null_map =
+        reinterpret_cast<int *>(record_->data() + table_meta.field(table_meta.null_field_offset())->offset());
     if (null_map[0] & (1 << (field_meta->field_id()))) {
       cell.set_null(field_meta->len());
       return RC::SUCCESS;

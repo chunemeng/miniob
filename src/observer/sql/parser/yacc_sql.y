@@ -429,6 +429,19 @@ create_table_stmt:    /*create table 语句的语法解析树*/
         free($8);
       }
     }
+    | CREATE TABLE ID AS select_stmt storage_format
+    {
+        $$ = new ParsedSqlNode(SCF_CREATE_TABLE_AS);
+        CreateTableSqlNode &create_table = $$->create_table;
+        create_table_as.relation_name = $3;
+        free($3);
+        create_table.select = std::make_unique<SubQueryExpr>(std::move($2->selection));
+        delete $5;
+        if ($6 != nullptr) {
+            create_table_as.storage_format = $6;
+            free($6);
+        }
+    }
     ;
 attr_def_list:
     /* empty */

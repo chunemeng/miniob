@@ -269,8 +269,7 @@ RC Table::update_record(Record &record, const FieldMeta *field_meta, Value &valu
 
   auto data = new char[table_meta_.record_size()];
   memcpy(data, record.data(), table_meta_.record_size());
-  auto null_map = reinterpret_cast<int *>(data + table_meta_.null_field_offset());
-
+  auto null_map          = reinterpret_cast<int *>(data + table_meta_.field(table_meta_.null_field_offset())->offset());
   const FieldMeta *field = field_meta;
 
   // TODO: optimize this
@@ -379,7 +378,7 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
   char *record_data = (char *)malloc(record_size);
   memset(record_data, 0, record_size);
 
-  auto null_map = reinterpret_cast<int *>(record_data + normal_field_start_index - table_meta_.null_field_num());
+  auto null_map = reinterpret_cast<int *>(record_data + table_meta_.field(table_meta_.null_field_offset())->offset());
 
   for (int i = 0; i < value_num && OB_SUCC(rc); i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
@@ -684,7 +683,7 @@ RC Table::update_record(Record &record, vector<const FieldMeta *> &field_meta, v
 
   auto data = new char[table_meta_.record_size()];
   memcpy(data, record.data(), table_meta_.record_size());
-  auto null_map = reinterpret_cast<int *>(data + table_meta_.null_field_offset());
+  auto null_map = reinterpret_cast<int *>(data + table_meta_.field(table_meta_.null_field_offset())->offset());
 
   for (size_t i = 0; i < field_meta.size(); i++) {
     const FieldMeta *field = field_meta[i];
@@ -745,8 +744,7 @@ RC Table::make_record(
 
   auto data = new char[table_meta_.record_size()];
   memcpy(data, record.data(), table_meta_.record_size());
-  auto null_map = reinterpret_cast<int *>(data + table_meta_.null_field_offset());
-  LOG_INFO("field name:%d, value:%d", field_meta.size(), values.size());
+  auto null_map = reinterpret_cast<int *>(data + table_meta_.field(table_meta_.null_field_offset())->offset());
 
   for (size_t i = 0; i < field_meta.size(); i++) {
     const FieldMeta *field = field_meta[i];

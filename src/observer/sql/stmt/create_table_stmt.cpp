@@ -16,8 +16,9 @@ See the Mulan PSL v2 for more details. */
 #include "common/types.h"
 #include "sql/stmt/create_table_stmt.h"
 #include "event/sql_debug.h"
+#include "sql/parser/expression_binder.h"
 
-RC CreateTableStmt::create(Db *db, const CreateTableSqlNode &create_table, Stmt *&stmt)
+RC CreateTableStmt::create(Db *db, CreateTableSqlNode &create_table, Stmt *&stmt)
 {
   StorageFormat storage_format = StorageFormat::UNKNOWN_FORMAT;
   if (create_table.storage_format.length() == 0) {
@@ -28,6 +29,23 @@ RC CreateTableStmt::create(Db *db, const CreateTableSqlNode &create_table, Stmt 
   if (storage_format == StorageFormat::UNKNOWN_FORMAT) {
     return RC::INVALID_ARGUMENT;
   }
+
+  if (create_table.attr_infos.empty()) {
+    std::unique_ptr<Expression>& expr = create_table.select;
+    if (expr == nullptr) {
+      return RC::INVALID_ARGUMENT;
+    }
+    BinderContext context;
+    context.set_db(db);
+    ExpressionBinder binder(context);
+    std::vector<std::unique_ptr<Expression>> exprs;
+    if (RC::SUCCESS != binder.bind_expression(expr, exprs)) {
+      return RC::INVALID_ARGUMENT;
+    }
+
+
+  }
+
   stmt = new CreateTableStmt(create_table.relation_name, create_table.attr_infos, storage_format);
   sql_debug("create table statement: table name %s", create_table.relation_name.c_str());
   return RC::SUCCESS;

@@ -32,7 +32,13 @@ RC CreateTableExecutor::execute(SQLStageEvent *sql_event)
   CreateTableStmt *create_table_stmt = static_cast<CreateTableStmt *>(stmt);
 
   const char *table_name = create_table_stmt->table_name().c_str();
-  RC rc = session->get_current_db()->create_table(table_name, create_table_stmt->attr_infos(), create_table_stmt->storage_format());
+  RC          rc         = session->get_current_db()->create_table(
+      table_name, create_table_stmt->attr_infos(), create_table_stmt->storage_format());
+
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("create table failed, table name: %s", table_name);
+    return rc;
+  }
 
   return rc;
 }
