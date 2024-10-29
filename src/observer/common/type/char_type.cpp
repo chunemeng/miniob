@@ -103,6 +103,7 @@ RC CharType::cast_to(const Value &val, AttrType type, Value &result) const
 int CharType::cast_cost(AttrType type)
 {
   switch (type) {
+    case AttrType::TEXTS:
     case AttrType::CHARS: return 0;
     case AttrType::INTS:
     case AttrType::FLOATS:

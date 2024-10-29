@@ -148,6 +148,7 @@ UnboundAggregateExpr *create_aggregate_expression(AggrType aggregate_name,
         TRX_ROLLBACK
         INT_T
         VECTOR_T
+        TEXT_T
         STRING_T
         DATE_T
         FLOAT_T
@@ -429,19 +430,6 @@ create_table_stmt:    /*create table 语句的语法解析树*/
         free($8);
       }
     }
-    | CREATE TABLE ID AS select_stmt storage_format
-    {
-        $$ = new ParsedSqlNode(SCF_CREATE_TABLE_AS);
-        CreateTableSqlNode &create_table = $$->create_table;
-        create_table_as.relation_name = $3;
-        free($3);
-        create_table.select = std::make_unique<SubQueryExpr>(std::move($2->selection));
-        delete $5;
-        if ($6 != nullptr) {
-            create_table_as.storage_format = $6;
-            free($6);
-        }
-    }
     ;
 attr_def_list:
     /* empty */
@@ -466,7 +454,15 @@ attr_def:
       $$ = new AttrInfoSqlNode;
       $$->type = (AttrType)$2;
       $$->name = $1;
-      $$->length = ($4) * sizeof(float);
+      if ($$->type == AttrType::VECTORS) {
+         $$->length = ($4) * sizeof(float);
+         if ($$->length > BP_PAGE_DATA_SIZE) {
+            $$->type = AttrType::HIGH_DIMS;
+           $$->length = (($$->length + BP_PAGE_DATA_SIZE - 1) / BP_PAGE_DATA_SIZE + 1) * sizeof(int);
+         }
+      } else {
+        $$->length = ($4);
+      }
       $$->nullable = $6;
       free($1);
     }
@@ -475,7 +471,12 @@ attr_def:
       $$ = new AttrInfoSqlNode;
       $$->type = (AttrType)$2;
       $$->name = $1;
-      $$->length = 4;
+      if ($$->type == AttrType::TEXTS) {
+        $$->length = sizeof(int) * 10;
+      } else {
+            $$->length = 4;
+      }
+
       $$->nullable = $3;
       free($1);
     }
@@ -512,6 +513,7 @@ type:
     | DATE_T   { $$ = static_cast<int>(AttrType::DATES); }
     | FLOAT_T  { $$ = static_cast<int>(AttrType::FLOATS); }
     | VECTOR_T { $$ = static_cast<int>(AttrType::VECTORS); }
+    | TEXT_T   { $$ = static_cast<int>(AttrType::TEXTS); }
     ;
 insert_stmt:        /*insert   语句的语法解析树*/
     INSERT INTO ID VALUES LBRACE value value_list RBRACE

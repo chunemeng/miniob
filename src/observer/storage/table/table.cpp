@@ -43,6 +43,11 @@ Table::~Table()
     data_buffer_pool_ = nullptr;
   }
 
+  if (temp_buffer_pool_ != nullptr) {
+    temp_buffer_pool_->close_file();
+    temp_buffer_pool_ = nullptr;
+  }
+
   for (vector<Index *>::iterator it = indexes_.begin(); it != indexes_.end(); ++it) {
     Index *index = *it;
     delete index;
@@ -122,6 +127,24 @@ RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, c
     // don't need to remove the data_file
     return rc;
   }
+  int start = table_meta_.sys_field_num();
+  for (int i = start; i < table_meta_.field_num(); ++i) {
+    auto type = table_meta_.field(i)->type();
+    if (type == AttrType::TEXTS || type == AttrType::HIGH_DIMS) {
+      std::string tem = table_temp_file(base_dir, name);
+      rc              = bpm.create_file(tem.c_str());
+      if (rc != RC::SUCCESS) {
+        LOG_ERROR("Failed to create disk buffer pool of data file. file name=%s", tem.c_str());
+        return rc;
+      }
+      rc = bpm.open_file(db_->log_handler(), tem.c_str(), temp_buffer_pool_);
+      if (rc != RC::SUCCESS) {
+        LOG_ERROR("Failed to open disk buffer pool for file:%s. rc=%d:%s", tem.c_str(), rc, strrc(rc));
+        return rc;
+      }
+      break;
+    }
+  }
 
   LOG_INFO("Successfully create table %s:%s", base_dir, name);
   return rc;
@@ -150,6 +173,8 @@ RC Table::drop(const char *meta_file)
   }
 
   data_buffer_pool_ = nullptr;
+
+  temp_buffer_pool_ = nullptr;
 
   delete record_handler_;
   record_handler_ = nullptr;
@@ -228,6 +253,25 @@ RC Table::open(Db *db, const char *meta_file, const char *base_dir)
       return rc;
     }
     indexes_.push_back(index);
+  }
+
+  int start = table_meta_.sys_field_num();
+  for (int i = start; i < table_meta_.field_num(); ++i) {
+    auto type = table_meta_.field(i)->type();
+    if (type == AttrType::TEXTS || type == AttrType::HIGH_DIMS) {
+      BufferPoolManager &bpm = db_->buffer_pool_manager();
+      std::string        tem = table_temp_file(base_dir, table_meta_.name());
+      if (rc != RC::SUCCESS) {
+        LOG_ERROR("Failed to create disk buffer pool of data file. file name=%s", tem.c_str());
+        return rc;
+      }
+      rc = bpm.open_file(db_->log_handler(), tem.c_str(), temp_buffer_pool_);
+      if (rc != RC::SUCCESS) {
+        LOG_ERROR("Failed to open disk buffer pool for file:%s. rc=%d:%s", tem.c_str(), rc, strrc(rc));
+        return rc;
+      }
+      break;
+    }
   }
 
   return rc;
@@ -394,22 +438,80 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
       }
       ASSERT(value_num <= 32, "can't support more than 32 fields");
       null_map[0] |= (1 << i);
+      if (field->type() == AttrType::TEXTS || field->type() == AttrType::HIGH_DIMS) {
+        auto bp  = reinterpret_cast<int *>(record_data + field->offset());
+        int  len = field->len() / static_cast<int>(sizeof(int));
+        for (int j = 0; j < len; j++) {
+          bp[j] = BP_INVALID_PAGE_NUM;
+        }
+        bp[len - 1] = 0;
+      }
     } else {
       if (field->type() != value.attr_type()) {
-        Value real_value;
-        rc = Value::cast_to(value, field->type(), real_value);
-        if (real_value.attr_type() == AttrType::VECTORS &&
-            (real_value.length() * sizeof(float)) != static_cast<size_t>(field->len())) {
-          LOG_INFO("field type: %d, value type: %d", field->type(), value.attr_type());
-          return RC::INVALID_ARGUMENT;
-        }
+        int         len           = value.length();
+        bool should_char = true;
+        std::string tmp;
+        const char *v_data = value.data();
+        switch (field->type()) {
+          case AttrType::HIGH_DIMS:
+            if (value.attr_type() == AttrType::VECTORS) {
+              tmp    = value.to_string();
+              v_data = tmp.c_str();
+              should_char = false;
+              len    = static_cast<int>(tmp.length());
+              [[fallthrough]];
+            }
+          case AttrType::TEXTS: {
+            if (should_char && value.attr_type() != AttrType::CHARS) {
+              LOG_INFO("field type: %d, value type: %d", field->type(), value.attr_type());
+              return RC::INVALID_ARGUMENT;
+            }
 
-        if (OB_FAIL(rc)) {
-          LOG_WARN("failed to cast value. table name:%s,field name:%s,value:%s ",
+            int pages     = (len + BP_PAGE_DATA_SIZE - 1) / BP_PAGE_DATA_SIZE;
+            int max_pages = field->len() / static_cast<int>(sizeof(int));
+            if (pages >= max_pages) {
+              LOG_ERROR("Failed to allocate page for text field. table name:%s, field name:%s",
+                                table_meta_.name(), field->name().c_str());
+              rc = RC::INTERNAL;
+              break;
+            }
+            auto bp = reinterpret_cast<int *>(record_data + field->offset());
+            for (int j = 0; j < pages; j++) {
+              Frame *frame = nullptr;
+              temp_buffer_pool_->allocate_page(&frame);
+              if (frame == nullptr) {
+                LOG_ERROR("Failed to allocate page for text field. table name:%s, field name:%s",
+                            table_meta_.name(), field->name().c_str());
+                rc = RC::INTERNAL;
+                break;
+              }
+              bp[j]      = frame->page_num();
+              Page &page = frame->page();
+              memcpy(page.data, v_data + j * BP_PAGE_DATA_SIZE, min(len - j * BP_PAGE_DATA_SIZE, BP_PAGE_DATA_SIZE));
+              frame->mark_dirty();
+            }
+            for (int j = pages; j < max_pages; j++) {
+              bp[j] = BP_INVALID_PAGE_NUM;
+            }
+            bp[max_pages - 1] = len;
+          } break;
+          default: {
+            Value real_value;
+            rc = Value::cast_to(value, field->type(), real_value);
+            if (real_value.attr_type() == AttrType::VECTORS &&
+                (real_value.length() * sizeof(float)) != static_cast<size_t>(field->len())) {
+              LOG_INFO("field type: %d, value type: %d", field->type(), value.attr_type());
+              return RC::INVALID_ARGUMENT;
+            }
+
+            if (OB_FAIL(rc)) {
+              LOG_WARN("failed to cast value. table name:%s,field name:%s,value:%s ",
             table_meta_.name(), field->name().c_str(), value.to_string().c_str());
-          break;
+              break;
+            }
+            rc = set_value_to_record(record_data, real_value, field);
+          }
         }
-        rc = set_value_to_record(record_data, real_value, field);
       } else {
         rc = set_value_to_record(record_data, value, field);
       }
@@ -675,6 +777,10 @@ RC Table::sync()
 
   rc = data_buffer_pool_->flush_all_pages();
   LOG_INFO("Sync table over. table=%s", name().c_str());
+  if (temp_buffer_pool_ != nullptr) {
+    rc = temp_buffer_pool_->flush_all_pages();
+    LOG_INFO("Sync table over. table=%s", name().c_str());
+  }
   return rc;
 }
 RC Table::update_record(Record &record, vector<const FieldMeta *> &field_meta, vector<Value> &values)
@@ -760,13 +866,71 @@ RC Table::make_record(
       null_map[0] |= (1 << (field->field_id()));
     } else {
       if (field->type() != value.attr_type()) {
-        Value real_value;
-        rc = Value::cast_to(value, field->type(), real_value);
-        if (OB_FAIL(rc)) {
-          LOG_WARN("failed to cast value. table name:%s,field name:%s,value:%s ",
+        int         len           = value.length();
+        std::string tmp;
+        const char *v_data = value.data();
+        switch (field->type()) {
+          case AttrType::HIGH_DIMS:
+            if (value.attr_type() == AttrType::VECTORS) {
+              tmp    = value.to_string();
+              v_data = tmp.c_str();
+              len    = static_cast<int>(tmp.length());
+              [[fallthrough]];
+            }
+          case AttrType::TEXTS: {
+            if (value.attr_type() != AttrType::CHARS) {
+              LOG_INFO("field type: %d, value type: %d", field->type(), value.attr_type());
+              return RC::INVALID_ARGUMENT;
+            }
+
+            int pages     = (len + BP_PAGE_DATA_SIZE - 1) / BP_PAGE_DATA_SIZE;
+            int max_pages = field->len() / static_cast<int>(sizeof(int));
+            if (pages >= max_pages) {
+              LOG_ERROR("Failed to allocate page for text field. table name:%s, field name:%s",
+                                table_meta_.name(), field->name().c_str());
+              rc = RC::INTERNAL;
+              break;
+            }
+            auto bp = reinterpret_cast<int *>(data + field->offset());
+            for (int j = 0; j < pages; j++) {
+              Frame *frame = nullptr;
+              temp_buffer_pool_->allocate_page(&frame);
+              if (frame == nullptr) {
+                LOG_ERROR("Failed to allocate page for text field. table name:%s, field name:%s",
+                            table_meta_.name(), field->name().c_str());
+                rc = RC::INTERNAL;
+                break;
+              }
+              bp[j]      = frame->page_num();
+              Page &page = frame->page();
+              memcpy(page.data, v_data + j * BP_PAGE_DATA_SIZE, min(len - j * BP_PAGE_DATA_SIZE, BP_PAGE_DATA_SIZE));
+              frame->mark_dirty();
+            }
+            for (int j = pages; j < max_pages; j++) {
+              if (bp[j] != BP_INVALID_PAGE_NUM) {
+                temp_buffer_pool_->dispose_page(bp[j]);
+              }
+              bp[j] = BP_INVALID_PAGE_NUM;
+            }
+            bp[max_pages - 1] = len;
+          } break;
+          default: {
+            Value real_value;
+            rc = Value::cast_to(value, field->type(), real_value);
+            if (real_value.attr_type() == AttrType::VECTORS &&
+                (real_value.length() * sizeof(float)) != static_cast<size_t>(field->len())) {
+              LOG_INFO("field type: %d, value type: %d", field->type(), value.attr_type());
+              return RC::INVALID_ARGUMENT;
+            }
+
+            if (OB_FAIL(rc)) {
+              LOG_WARN("failed to cast value. table name:%s,field name:%s,value:%s ",
             table_meta_.name(), field->name().c_str(), value.to_string().c_str());
+              break;
+            }
+            rc = set_value_to_record(data, real_value, field);
+          }
         }
-        rc = set_value_to_record(data, real_value, field);
       } else {
         rc = set_value_to_record(data, value, field);
       }
@@ -781,4 +945,20 @@ RC Table::make_record(
     return rc;
   }
   return rc;
+}
+RC Table::read_from_big_page(char *data, int len, int *page_nums, int page_num) const
+{
+  for (int i = 0; i < page_num; i++) {
+    Frame *frame;
+    RC     rc = temp_buffer_pool_->get_this_page(page_nums[i], &frame);
+    if (rc != RC::SUCCESS) {
+      LOG_ERROR("Failed to get page for text field. table name:%s",
+                        table_meta_.name());
+      return rc;
+    }
+    Page &page = frame->page();
+    memcpy(data + i * BP_PAGE_DATA_SIZE, page.data, std::min(len - i * BP_PAGE_DATA_SIZE, BP_PAGE_DATA_SIZE));
+  }
+  data[len] = '\0';
+  return RC::SUCCESS;
 }

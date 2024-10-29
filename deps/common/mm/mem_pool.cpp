@@ -14,22 +14,22 @@ See the Mulan PSL v2 for more details. */
 #include "common/mm/mem_pool.h"
 namespace common {
 
-int MemPoolItem::init(int item_size, bool dynamic, int pool_num, int item_num_per_pool)
+int MemPoolItem::init(int item_s, bool dy, int pool_num, int item_num_per_p)
 {
   if (pools.empty() == false) {
     LOG_WARN("Memory pool has been initialized, but still begin to be initialized, this->name:%s.", this->name.c_str());
     return 0;
   }
 
-  if (item_size <= 0 || pool_num <= 0 || item_num_per_pool <= 0) {
-    LOG_ERROR("Invalid arguments, item_size:%d, pool_num:%d, item_num_per_pool:%d, this->name:%s.",
-        item_size, pool_num, item_num_per_pool, this->name.c_str());
+  if (item_s <= 0 || pool_num <= 0 || item_num_per_p <= 0) {
+    LOG_ERROR("Invalid arguments, item_s:%d, pool_num:%d, item_num_per_p:%d, this->name:%s.",
+        item_s, pool_num, item_num_per_p, this->name.c_str());
     return -1;
   }
 
-  this->item_size         = item_size;
-  this->item_num_per_pool = item_num_per_pool;
-  // in order to init memory pool, enable dynamic here
+  this->item_size         = item_s;
+  this->item_num_per_pool = item_num_per_p;
+  // in order to init memory pool, enable dy here
   this->dynamic = true;
   for (int i = 0; i < pool_num; i++) {
     if (extend() < 0) {
@@ -37,10 +37,10 @@ int MemPoolItem::init(int item_size, bool dynamic, int pool_num, int item_num_pe
       return -1;
     }
   }
-  this->dynamic = dynamic;
+  this->dynamic = dy;
 
-  LOG_INFO("Extend one pool, this->size:%d, item_size:%d, item_num_per_pool:%d, this->name:%s.",
-      this->size, item_size, item_num_per_pool, this->name.c_str());
+  LOG_INFO("Extend one pool, this->size:%d, item_s:%d, item_num_per_p:%d, this->name:%s.",
+      this->size, item_s, item_num_per_p, this->name.c_str());
   return 0;
 }
 

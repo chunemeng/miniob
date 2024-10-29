@@ -88,13 +88,12 @@ public:
 
   RC update_record(Record &old_record, const FieldMeta *field_meta, Value &value);
 
-  RC update_record(Record &old_record, std::vector<const FieldMeta*>& field_meta, std::vector<Value> &value);
+  RC update_record(Record &old_record, std::vector<const FieldMeta *> &field_meta, std::vector<Value> &value);
 
-  RC make_record(const Record& record, std::vector<const FieldMeta*>& field_meta, std::vector<Value> &value, Record& new_record);
-
+  RC make_record(
+      const Record &record, std::vector<const FieldMeta *> &field_meta, std::vector<Value> &value, Record &new_record);
 
   RC recover_insert_record(Record &record);
-
 
   RC create_index(Trx *trx, std::vector<const FieldMeta *> &field_meta, const char *index_name, bool is_unique);
 
@@ -119,6 +118,8 @@ public:
 
   Db *db() const { return db_; }
 
+  RC read_from_big_page(char *data, int size, int *page_nums, int page_num) const;
+
   const TableMeta &table_meta() const;
 
   RC sync();
@@ -140,6 +141,7 @@ private:
   string             base_dir_;
   TableMeta          table_meta_;
   DiskBufferPool    *data_buffer_pool_ = nullptr;  /// 数据文件关联的buffer pool
+  DiskBufferPool    *temp_buffer_pool_ = nullptr;  /// 临时buffer pool
   RecordFileHandler *record_handler_   = nullptr;  /// 记录操作
   vector<Index *>    indexes_;
 };

@@ -332,11 +332,11 @@ public:
   /**
    * init memory pool, the major job is to alloc memory for memory pool
    * @param pool_num, memory pool's number
-   * @param item_num_per_pool, how many items per pool.
+   * @param item_num_per_p, how many items per pool.
    * @return
    */
-  int init(int item_size, bool dynamic = true, int pool_num = DEFAULT_POOL_NUM,
-      int item_num_per_pool = DEFAULT_ITEM_NUM_PER_POOL);
+  int init(int item_s, bool dy = true, int pool_num = DEFAULT_POOL_NUM,
+      int item_num_per_p = DEFAULT_ITEM_NUM_PER_POOL);
 
   /**
    * Do cleanup job for memory pool

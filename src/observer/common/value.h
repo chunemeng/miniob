@@ -121,7 +121,6 @@ public:
   void     set_null(int len = 0);
   void     set_vector(float *vec, int len);
   void     set_vector(std::vector<float> &vec);
-  AttrType get_result_type(const Value &left, const Value &right) const;
 
   string to_string() const;
 

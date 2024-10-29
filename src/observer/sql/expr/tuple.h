@@ -201,16 +201,30 @@ public:
 
     FieldExpr       *field_expr = speces_[index];
     const FieldMeta *field_meta = field_expr->field().meta();
-    const auto  &     table_meta = table_->table_meta();
+    const auto      &table_meta = table_->table_meta();
 
-    auto             null_map =
+    auto null_map =
         reinterpret_cast<int *>(record_->data() + table_meta.field(table_meta.null_field_offset())->offset());
     if (null_map[0] & (1 << (field_meta->field_id()))) {
       cell.set_null(field_meta->len());
       return RC::SUCCESS;
     } else {
-      cell.set_type(field_meta->type());
-      cell.set_data(this->record_->data() + field_meta->offset(), field_meta->len());
+      if (field_meta->type() == AttrType::TEXTS || field_meta->type() == AttrType::HIGH_DIMS) {
+        auto  bp       = reinterpret_cast<int32_t *>(record_->data() + field_meta->offset());
+        int   len      = bp[9];
+        char *str      = new char[len + 1];
+        int   page_num = (len + BP_PAGE_DATA_SIZE - 1) / BP_PAGE_DATA_SIZE;
+        RC    rc       = table_->read_from_big_page(str, len, bp, page_num);
+        if (rc != RC::SUCCESS) {
+          delete[] str;
+          return rc;
+        }
+        cell.set_type(field_meta->type());
+        cell.set_data(str, len);
+      } else {
+        cell.set_type(field_meta->type());
+        cell.set_data(record_->data() + field_meta->offset(), field_meta->len());
+      }
     }
     return RC::SUCCESS;
   }

@@ -125,6 +125,11 @@ void Value::set_data(char *data, int length)
     case AttrType::CHARS: {
       set_string(data, length);
     } break;
+    case AttrType::TEXTS: {
+      value_.pointer_value_ = data;
+      own_data_             = true;
+      length_               = length;
+    } break;
     case AttrType::INTS: {
       value_.int_value_ = *(int *)data;
       length_           = length;
@@ -140,6 +145,15 @@ void Value::set_data(char *data, int length)
     case AttrType::DATES: {
       value_.int_value_ = *(int *)data;
       length_           = length;
+    } break;
+    case AttrType::HIGH_DIMS: {
+      Value tmp;
+      tmp.own_data_             = false;
+      tmp.length_               = length;
+      tmp.value_.pointer_value_ = data;
+      Value::cast_to(tmp, AttrType::VECTORS, *this);
+      attr_type_ = AttrType::HIGH_DIMS;
+      own_data_  = true;
     } break;
     case AttrType::VECTORS: {
       own_data_            = true;
@@ -175,7 +189,7 @@ void Value::set_vector(std::vector<float> &vec)
   reset();
   attr_type_           = AttrType::VECTORS;
   own_data_            = true;
-  length_              = vec.size();
+  length_              = static_cast<int>(vec.size());
   value_.vector_value_ = new float[length_];
   memcpy(value_.vector_value_, vec.data(), length_ * sizeof(float));
 }
