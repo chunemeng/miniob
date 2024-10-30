@@ -99,9 +99,14 @@ RC TableMeta::init(int32_t table_id, const char *name, const std::vector<FieldMe
     int length = static_cast<int>(attr_info.length);
     if (attr_info.type == AttrType::HIGH_DIMS) {
       // NOTE: 这里页的数量不需要+1，因为不需要存储长度
+      if (length > 16000) {
+        LOG_WARN("The length of high dims is too large. length=%d", length);
+        return RC::INVALID_ARGUMENT;
+      }
+
       int pages_nums = static_cast<int>(((length * sizeof(float) + BP_PAGE_DATA_SIZE - 1) / BP_PAGE_DATA_SIZE));
       LOG_INFO("tlength=%d, pages_nums=%d  %d", length, pages_nums , (length << 3) + pages_nums);
-      length         = (length << 3) + pages_nums;
+      length = (length << 3) + pages_nums;
     }
 
     rc = fields_[i + trx_field_num].init(attr_info.name.c_str(),
