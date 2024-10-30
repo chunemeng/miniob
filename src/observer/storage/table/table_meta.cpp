@@ -102,7 +102,6 @@ RC TableMeta::init(int32_t table_id, const char *name, const std::vector<FieldMe
       int pages_nums = static_cast<int>(((length * sizeof(float) + BP_PAGE_DATA_SIZE - 1) / BP_PAGE_DATA_SIZE));
       LOG_INFO("tlength=%d, pages_nums=%d  %d", length, pages_nums , (length << 3) + pages_nums);
       length         = (length << 3) + pages_nums;
-
     }
 
     rc = fields_[i + trx_field_num].init(attr_info.name.c_str(),
@@ -116,7 +115,6 @@ RC TableMeta::init(int32_t table_id, const char *name, const std::vector<FieldMe
       LOG_ERROR("Failed to init field meta. table name=%s, field name: %s", name, attr_info.name.c_str());
       return rc;
     }
-
     field_offset += fields_[i + trx_field_num].len();
   }
 

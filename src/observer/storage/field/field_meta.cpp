@@ -72,7 +72,7 @@ int FieldMeta::offset() const { return attr_offset_; }
 
 int FieldMeta::len() const
 {
-  return attr_type_ == AttrType::HIGH_DIMS ? static_cast<int>((attr_len_ & 8) * sizeof(int)) : attr_len_;
+  return attr_type_ == AttrType::HIGH_DIMS ? static_cast<int>((attr_len_ & 7) * sizeof(int)) : attr_len_;
 }
 
 bool FieldMeta::visible() const { return visible_; }

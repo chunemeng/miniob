@@ -459,7 +459,7 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
         std::string tmp;
         switch (field->type()) {
           case AttrType::HIGH_DIMS: {
-            if (value.attr_type() != AttrType::VECTORS || value.attr_type() != AttrType::CHARS) {
+            if (value.attr_type() != AttrType::VECTORS && value.attr_type() != AttrType::CHARS) {
               LOG_INFO("field type: %d, value type: %d", field->type(), value.attr_type());
               return RC::INVALID_ARGUMENT;
             }
@@ -478,6 +478,7 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
             }
             int pages = field->len() / static_cast<int>(sizeof(int));
             len       = real_value->length() * sizeof(float);
+            LOG_INFO("field len: %d, value len: %d field real_len", field->len(), len, field->real_len());
             auto bp   = std::launder(reinterpret_cast<int *>(record_data + field->offset()));
             for (int j = 0; j < pages; j++) {
               Frame *frame = nullptr;
@@ -541,7 +542,7 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
             rc = Value::cast_to(value, field->type(), real_value);
             if (real_value.attr_type() == AttrType::VECTORS &&
                 (real_value.length() * sizeof(float)) != static_cast<size_t>(field->len())) {
-              LOG_INFO("field type: %d, value type: %d", field->type(), value.attr_type());
+              LOG_INFO("field len: %d, value len: %d", field->len(), real_value.length());
               return RC::INVALID_ARGUMENT;
             }
 
@@ -932,7 +933,7 @@ RC Table::make_record(
         std::string tmp;
         switch (field->type()) {
           case AttrType::HIGH_DIMS: {
-            if (value.attr_type() != AttrType::VECTORS || value.attr_type() != AttrType::CHARS) {
+            if (value.attr_type() != AttrType::VECTORS && value.attr_type() != AttrType::CHARS) {
               LOG_INFO("field type: %d, value type: %d", field->type(), value.attr_type());
               return RC::INVALID_ARGUMENT;
             }

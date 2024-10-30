@@ -455,11 +455,15 @@ attr_def:
       $$->type = (AttrType)$2;
       $$->name = $1;
       if ($$->type == AttrType::VECTORS) {
+         $$->length = $4 * sizeof(float);
          if ($$->length > BP_PAGE_DATA_SIZE) {
             $$->type = AttrType::HIGH_DIMS;
+            $$->length = $4;
          }
+      } else {
+            $$->length = ($4);
       }
-      $$->length = ($4);
+
 
       $$->nullable = $6;
       free($1);
