@@ -209,13 +209,27 @@ public:
       cell.set_null(field_meta->len());
       return RC::SUCCESS;
     } else {
-      if (field_meta->type() == AttrType::TEXTS || field_meta->type() == AttrType::HIGH_DIMS) {
+      if (field_meta->type() == AttrType::TEXTS) {
         auto bp        = reinterpret_cast<int32_t *>(record_->data() + field_meta->offset());
         int  max_pages = field_meta->len() / sizeof(int);
         int  len       = bp[max_pages - 1];
 
         char *str      = new char[len + 1];
         int   page_num = (len + BP_PAGE_DATA_SIZE - 1) / BP_PAGE_DATA_SIZE;
+        RC    rc       = table_->read_from_big_page(str, len, bp, page_num);
+        str[len] = '\0';
+        if (rc != RC::SUCCESS) {
+          delete[] str;
+          return rc;
+        }
+        cell.set_type(field_meta->type());
+        cell.set_data(str, len);
+      } else if (field_meta->type() == AttrType::HIGH_DIMS) {
+        auto bp        = reinterpret_cast<int32_t *>(record_->data() + field_meta->offset());
+        int  len       = field_meta->real_len() * sizeof(float);
+
+        char *str      = new char[len];
+        int   page_num = field_meta->len() / sizeof(int);
         RC    rc       = table_->read_from_big_page(str, len, bp, page_num);
         if (rc != RC::SUCCESS) {
           delete[] str;

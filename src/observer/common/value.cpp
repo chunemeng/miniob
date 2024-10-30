@@ -147,13 +147,12 @@ void Value::set_data(char *data, int length)
       length_           = length;
     } break;
     case AttrType::HIGH_DIMS: {
-      Value tmp;
-      tmp.own_data_             = false;
-      tmp.length_               = length;
-      tmp.value_.pointer_value_ = data;
-      Value::cast_to(tmp, AttrType::VECTORS, *this);
-      attr_type_ = AttrType::HIGH_DIMS;
-      own_data_  = true;
+      own_data_            = true;
+      length_              = length / sizeof(float);
+      // NOTE: we need to use std::launder here to avoid undefined behavior,
+      // or we can just use memcpy
+      // STRICT ALIASING RULE: https://en.cppreference.com/w/cpp/language/reinterpret_cast
+      value_.vector_value_ = std::launder(reinterpret_cast<float *>(data));
     } break;
     case AttrType::VECTORS: {
       own_data_            = true;
@@ -294,6 +293,7 @@ const char *Value::data() const
       return value_.pointer_value_;
     } break;
     case AttrType::VECTORS: {
+      // FIXME: THIS MAY BE A UB(?)
       return reinterpret_cast<const char *>(value_.vector_value_);
     } break;
     default: {

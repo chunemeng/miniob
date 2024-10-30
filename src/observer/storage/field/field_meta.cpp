@@ -70,7 +70,10 @@ AttrType FieldMeta::type() const { return attr_type_; }
 
 int FieldMeta::offset() const { return attr_offset_; }
 
-int FieldMeta::len() const { return attr_len_; }
+int FieldMeta::len() const
+{
+  return attr_type_ == AttrType::HIGH_DIMS ? static_cast<int>((attr_len_ & 8) * sizeof(int)) : attr_len_;
+}
 
 bool FieldMeta::visible() const { return visible_; }
 
@@ -153,4 +156,9 @@ RC FieldMeta::from_json(const Json::Value &json_value, FieldMeta &field)
   bool        nullable = nullable_value.asBool();
   int         field_id = field_id_value.asInt();
   return field.init(name, type, offset, len, visible, field_id, nullable);
+}
+int FieldMeta::real_len() const
+{
+  ASSERT(attr_type_ == AttrType::HIGH_DIMS, "WRONG TYPE TO GET REAL LEN");
+  return attr_len_ >> 3;
 }

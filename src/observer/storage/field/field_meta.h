@@ -42,6 +42,7 @@ public:
   AttrType           type() const;
   int                offset() const;
   int                len() const;
+  int                real_len() const;
   bool               visible() const;
   bool               nullable() const;
   int                field_id() const;
