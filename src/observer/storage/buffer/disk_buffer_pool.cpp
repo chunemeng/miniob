@@ -711,6 +711,7 @@ RC DiskBufferPool::allocate_frame(PageNum page_num, Frame **buffer)
     return rc;
   };
 
+  int count = 0;
   while (true) {
     Frame *frame = frame_manager_.alloc(id(), page_num);
     if (frame != nullptr) {
@@ -721,6 +722,11 @@ RC DiskBufferPool::allocate_frame(PageNum page_num, Frame **buffer)
 
     LOG_TRACE("frames are all allocated, so we should purge some frames to get one free frame");
     (void)frame_manager_.purge_frames(1 /*count*/, purger);
+
+    if (++count > 25) {
+      LOG_ERROR("Failed to allocate frame %s:%d, due to failed to purge frames.", file_name_.c_str(), page_num);
+      return RC::BUFFERPOOL_NOBUF;
+    }
   }
   return RC::BUFFERPOOL_NOBUF;
 }

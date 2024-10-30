@@ -113,10 +113,10 @@ public:
   /**
    * init memory pool, the major job is to alloc memory for memory pool
    * @param pool_num, memory pool's number
-   * @param item_num_per_pool, how many items per pool.
+   * @param item_num_per_p, how many items per pool.
    * @return 0 for success and others failure
    */
-  int init(bool dynamic = true, int pool_num = DEFAULT_POOL_NUM, int item_num_per_pool = DEFAULT_ITEM_NUM_PER_POOL);
+  int init(bool dynamic = true, int pool_num = DEFAULT_POOL_NUM, int item_num_per_p = DEFAULT_ITEM_NUM_PER_POOL);
 
   /**
    * Do cleanup job for memory pool
@@ -164,20 +164,20 @@ protected:
 };
 
 template <class T>
-int MemPoolSimple<T>::init(bool dynamic, int pool_num, int item_num_per_pool)
+int MemPoolSimple<T>::init(bool dynamic, int pool_num, int item_num_per_p)
 {
   if (pools.empty() == false) {
     LOG_WARN("Memory pool has been initialized, but still begin to be initialized, this->name:%s.", this->name.c_str());
     return 0;
   }
 
-  if (pool_num <= 0 || item_num_per_pool <= 0) {
-    LOG_ERROR("Invalid arguments,  pool_num:%d, item_num_per_pool:%d, this->name:%s.",
-              pool_num, item_num_per_pool, this->name.c_str());
+  if (pool_num <= 0 || item_num_per_p <= 0) {
+    LOG_ERROR("Invalid arguments,  pool_num:%d, item_num_per_p:%d, this->name:%s.",
+              pool_num, item_num_per_p, this->name.c_str());
     return -1;
   }
 
-  this->item_num_per_pool = item_num_per_pool;
+  this->item_num_per_pool = item_num_per_p;
   // in order to init memory pool, enable dynamic here
   this->dynamic = true;
   for (int i = 0; i < pool_num; i++) {
@@ -188,8 +188,8 @@ int MemPoolSimple<T>::init(bool dynamic, int pool_num, int item_num_per_pool)
   }
   this->dynamic = dynamic;
 
-  LOG_INFO("Extend one pool, this->size:%d, item_num_per_pool:%d, this->name:%s.",
-           this->size, item_num_per_pool, this->name.c_str());
+  LOG_INFO("Extend one pool, this->size:%d, item_num_per_p:%d, this->name:%s.",
+           this->size, item_num_per_p, this->name.c_str());
   return 0;
 }
 

@@ -924,6 +924,7 @@ RC Table::make_record(
               }
               bp[j] = BP_INVALID_PAGE_NUM;
             }
+            LOG_INFO("%d", len);
             bp[max_pages - 1] = len;
           } break;
           default: {
@@ -958,6 +959,7 @@ RC Table::make_record(
   }
   return rc;
 }
+
 RC Table::read_from_big_page(char *data, int len, int *page_nums, int page_num) const
 {
   for (int i = 0; i < page_num; i++) {
