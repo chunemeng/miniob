@@ -31,16 +31,18 @@ RC CreateTableStmt::create(Db *db, CreateTableSqlNode &create_table, Stmt *&stmt
   }
 
   SelectStmt *select_stmt = nullptr;
-  if (create_table.attr_infos.empty()) {
+  if (create_table.select != nullptr) {
     Stmt *select_stmt_t = nullptr;
-    RC    rc            = SelectStmt::create(db, create_table.select, select_stmt_t);
+    RC    rc            = SelectStmt::create(db, *create_table.select, select_stmt_t);
     if (rc != RC::SUCCESS) {
       return rc;
     }
     select_stmt = dynamic_cast<SelectStmt *>(select_stmt_t);
-    rc          = select_stmt->get_attr_infos(create_table.attr_infos);
-    if (rc != RC::SUCCESS) {
-      return rc;
+    if (create_table.attr_infos.empty()) {
+      rc = select_stmt->get_attr_infos(create_table.attr_infos);
+      if (rc != RC::SUCCESS) {
+        return rc;
+      }
     }
   }
 

@@ -46,6 +46,7 @@ RC CreateTableExecutor::execute(SQLStageEvent *sql_event)
   }
 
   if (create_table_stmt->select_stmt() != nullptr) {
+    LOG_INFO("create table with select");
     LogicalPlanGenerator  logical_plan_generator_;   ///< 根据SQL生成逻辑计划
     PhysicalPlanGenerator physical_plan_generator_;  ///< 根据逻辑计划生成物理计划
     Rewriter              rewriter_;                 ///< 逻辑计划改写
@@ -64,7 +65,6 @@ RC CreateTableExecutor::execute(SQLStageEvent *sql_event)
       return RC::SUCCESS;
     }
 
-    // NOTE: REWRITE 可能导致把子查询中来自外部的字段替换成推下
     bool change_made = false;
     do {
       change_made = false;

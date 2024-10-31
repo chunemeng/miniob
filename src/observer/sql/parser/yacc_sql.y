@@ -232,6 +232,7 @@ UnboundAggregateExpr *create_aggregate_expression(AggrType aggregate_name,
 %type <number>              number
 %type <number>              unique_op
 %type <expression>          eq_expr
+%type <sql_node>          as_select_opt
 %type <number>              order_opt
 %type <expression>          order_b
 %type <expression_list>     order_by
@@ -408,11 +409,21 @@ drop_index_stmt:      /*drop index 语句的语法解析树*/
       free($5);
     }
     ;
-create_table_stmt:    /*create table 语句的语法解析树*/
-    CREATE TABLE ID LBRACE attr_def attr_def_list RBRACE storage_format
+as_select_opt:
+    AS select_stmt {
+      $$ = $2;
+    }
+    | /* empty */
     {
-      $$ = new ParsedSqlNode(SCF_CREATE_TABLE);
-      CreateTableSqlNode &create_table = $$->create_table;
+      $$ = nullptr;
+    }
+    ;
+
+create_table_stmt:    /*create table 语句的语法解析树*/
+    CREATE TABLE ID LBRACE attr_def attr_def_list RBRACE as_select_opt storage_format
+    {
+      auto node = new ParsedSqlNode(SCF_CREATE_TABLE);
+      CreateTableSqlNode &create_table = node->create_table;
       create_table.relation_name = $3;
       free($3);
 
@@ -426,25 +437,17 @@ create_table_stmt:    /*create table 语句的语法解析树*/
       std::reverse(create_table.attr_infos.begin(), create_table.attr_infos.end());
       delete $5;
       if ($8 != nullptr) {
-        create_table.storage_format = $8;
-        free($8);
+        create_table.select = std::make_unique<SelectSqlNode>(std::move(($8->selection)));
+        delete $8;
+      }
+
+      $$ = node;
+
+      if ($9 != nullptr) {
+        create_table.storage_format = $9;
+        free($9);
       }
     }
-    |  CREATE TABLE ID AS select_stmt storage_format
-    {
-       $$ = new ParsedSqlNode(SCF_CREATE_TABLE);
-       CreateTableSqlNode &create_table = $$->create_table;
-       create_table.relation_name = $3;
-       free($3);
-
-       create_table.select = std::move($5->selection);
-       delete $5;
-       if ($6 != nullptr) {
-         create_table.storage_format = $6;
-         free($6);
-       }
-    }
-
     ;
 attr_def_list:
     /* empty */
