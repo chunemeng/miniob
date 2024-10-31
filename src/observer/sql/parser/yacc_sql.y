@@ -410,7 +410,10 @@ drop_index_stmt:      /*drop index 语句的语法解析树*/
     }
     ;
 as_select_opt:
-    AS select_stmt {
+    select_stmt {
+      $$ = $1;
+    }
+    | AS select_stmt {
       $$ = $2;
     }
     | /* empty */

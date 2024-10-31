@@ -97,6 +97,7 @@ RC CreateTableExecutor::execute(SQLStageEvent *sql_event)
     values_.resize(create_table_stmt->attr_infos().size());
 
     while (OB_SUCC(rc = oper->next())) {
+      LOG_INFO("get next record");
       Tuple *tuple = oper->current_tuple();
       for (size_t i = 0; i < values_.size(); ++i) {
         tuple->cell_at(static_cast<int>(i), values_[i]);
@@ -114,6 +115,7 @@ RC CreateTableExecutor::execute(SQLStageEvent *sql_event)
         LOG_WARN("failed to insert record by transaction. rc=%s", strrc(rc));
       }
     }
+
     if (rc != RC::RECORD_EOF) {
       LOG_WARN("failed to get next record. rc=%s", strrc(rc));
       return rc;
