@@ -281,10 +281,9 @@ UnboundAggregateExpr *create_aggregate_expression(AggrType aggregate_name,
 // commands should be a list but I use a single command instead
 %type <sql_node>            commands
 
-%left '+' '-'
+%left '+' '-' AS ID
 %left '*' '/'
 %nonassoc UMINUS
-%nonassoc  ASSIGN
 %%
 
 commands: command_wrapper opt_semicolon  //commands or sqls. parser starts here.
@@ -828,8 +827,35 @@ as_opt:
       $$ = $1;
     }
     ;
+
 expression:
-    expression '+' expression {
+    rel_attr as_opt {
+      RelAttrSqlNode *node = $1;
+      UnboundFieldExpr * ex = new UnboundFieldExpr(node->relation_name, node->attribute_name);
+
+
+      if ($2 != nullptr) {
+        ex->set_name($2);
+        ex->set_alias(true);
+        free($2);
+      } else {
+        ex->set_name(token_name(sql_string, &@$));
+      }
+
+      $$ = ex;
+      delete $1;
+    }
+    | expression ID {
+            $$ = $1;
+            $$->set_name($2);
+            free($2);
+    }
+   | expression AS ID {
+            $$ = $1;
+            $$->set_name($3);
+            free($3);
+    }
+    | expression '+' expression {
       $$ = create_arithmetic_expression(ArithmeticExpr::Type::ADD, $1, $3, sql_string, &@$);
     }
     | expression '-' expression {
@@ -863,30 +889,6 @@ expression:
       $$ = new ValueExpr(*$1);
       $$->set_name(token_name(sql_string, &@$));
       delete $1;
-    }
-    | rel_attr as_opt {
-      RelAttrSqlNode *node = $1;
-      UnboundFieldExpr * ex = new UnboundFieldExpr(node->relation_name, node->attribute_name);
-
-      if ($2 != nullptr) {
-        ex->set_alias(true);
-        ex->set_name($2);
-        free($2);
-      } else {
-        ex->set_name(token_name(sql_string, &@$));
-      }
-      $$ = ex;
-      delete $1;
-    }
-    | expression ID {
-        $$ = $1;
-        $$->set_name($2);
-        free($2);
-    }
-    | expression AS ID {
-        $$ = $1;
-        $$->set_name($3);
-        free($3);
     }
 
     | LBRACE select_stmt RBRACE {
@@ -939,6 +941,7 @@ expression:
       $$ = create_aggregate_expression(AggrType::MIN, std::move(*$3), sql_string, &@$);
       delete $3;
     }
+
     // your code here
     ;
 
