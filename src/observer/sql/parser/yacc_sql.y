@@ -448,6 +448,25 @@ create_table_stmt:    /*create table 语句的语法解析树*/
         free($9);
       }
     }
+    |CREATE TABLE ID as_select_opt storage_format
+     {
+       auto node = new ParsedSqlNode(SCF_CREATE_TABLE);
+       CreateTableSqlNode &create_table = node->create_table;
+       create_table.relation_name = $3;
+       free($3);
+
+       if ($4 != nullptr) {
+         create_table.select = std::make_unique<SelectSqlNode>(std::move(($4->selection)));
+         delete $4;
+       }
+
+       $$ = node;
+
+       if ($5 != nullptr) {
+         create_table.storage_format = $5;
+         free($5);
+       }
+     }
     ;
 attr_def_list:
     /* empty */
