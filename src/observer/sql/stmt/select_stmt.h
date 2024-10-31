@@ -52,6 +52,8 @@ public:
   std::vector<std::unique_ptr<Expression>> &group_by() { return group_by_; }
   std::vector<std::unique_ptr<Expression>> &order_by() { return order_by_; }
 
+  RC get_attr_infos(std::vector<AttrInfoSqlNode> &field_meta);
+
 private:
   std::vector<std::unique_ptr<Expression>> query_expressions_;
   std::vector<Table *>                     tables_;

@@ -285,3 +285,24 @@ RC SelectStmt::create(BinderContext &binder_context, SelectSqlNode &select_sql, 
   stmt = select_stmt;
   return RC::SUCCESS;
 }
+RC SelectStmt::get_attr_infos(vector<AttrInfoSqlNode> &field_meta) {
+  for (const unique_ptr<Expression> &expression : query_expressions_) {
+    AttrInfoSqlNode attr_info;
+    switch (expression->type()) {
+      case ExprType::FIELD: {
+        FieldExpr *field_expr = dynamic_cast<FieldExpr *>(expression.get());
+        auto field = field_expr->field().meta();
+        attr_info.type = field->type();
+        attr_info.name = field->name();
+        attr_info.nullable = field->nullable();
+        attr_info.length = field->len();
+        break;
+      }
+      default:
+        LOG_WARN("invalid expression type. type=%d", expression->type());
+        return RC::INVALID_ARGUMENT;
+    }
+    field_meta.emplace_back(attr_info);
+  }
+  return RC::SUCCESS;
+}

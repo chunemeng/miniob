@@ -115,8 +115,7 @@ public:
 
   const std::string &get_name() const { return name_; }
 
-
-  virtual void        set_name(const std::string &name) { name_ = name; }
+  virtual void set_name(const std::string &name) { name_ = name; }
 
   /**
    * @brief 表达式在下层算子返回的 chunk 中的位置
@@ -230,11 +229,9 @@ public:
 
   RC get_value(const Tuple &tuple, Value &value) const override { return RC::INTERNAL; }
 
-  RC get_attr_type(std::vector<AttrInfoSqlNode> &) const;
-
   RC try_get_value_fun(Value &value);
 
-  RC create_select(BinderContext & binder_context, bool should_one = true);
+  RC create_select(BinderContext &binder_context, bool should_one = true);
 
 private:
   bool                              should_one_ = true;
@@ -292,35 +289,36 @@ public:
 
     RC rc    = RC::SUCCESS;
     is_init_ = true;
-    for (const auto &expr : children_) {
-      switch (expr->type()) {
-        case ExprType::VALUE: {
-          Value v;
-          rc = expr->try_get_value(v);
-          if (rc != RC::SUCCESS) {
-            return rc;
-          }
-          value_list_.emplace_back(v);
-          break;
-        }
-        case ExprType::SUBQUERY: {
-          SubQueryExpr *subquery_expr = static_cast<SubQueryExpr *>(expr.get());
-
-          Value v;
-
-          while ((rc = subquery_expr->try_get_value_fun(v)) == RC::SUCCESS) {
+      for (const auto &expr : children_) {
+        switch (expr->type()) {
+          case ExprType::VALUE: {
+            Value v;
+            rc = expr->try_get_value(v);
+            if (rc != RC::SUCCESS) {
+              return rc;
+            }
             value_list_.emplace_back(v);
+            break;
           }
+          case ExprType::SUBQUERY: {
+            SubQueryExpr *subquery_expr = static_cast<SubQueryExpr *>(expr.get());
 
-          if (rc != RC::RECORD_EOF) {
-            return rc;
-          }
-          rc = RC::SUCCESS;
+            Value v;
 
-          break;
-        };
-        default: return RC::INTERNAL;
-      }
+            while ((rc = subquery_expr->try_get_value_fun(v)) == RC::SUCCESS) {
+              value_list_.emplace_back(v);
+            }
+
+            if (rc != RC::RECORD_EOF) {
+              return rc;
+            }
+            rc = RC::SUCCESS;
+
+            break;
+          };
+          default: return RC::INTERNAL;
+        }
+
     }
     return rc;
   }
@@ -328,7 +326,7 @@ public:
   const std::vector<Value> &value_list() const { return value_list_; }
 
 private:
-  bool                                     is_init_ = false;
+  bool                                     is_init_    = false;
   std::vector<std::unique_ptr<Expression>> children_;
   std::vector<Value>                       value_list_;
 };

@@ -30,28 +30,26 @@ RC CreateTableStmt::create(Db *db, CreateTableSqlNode &create_table, Stmt *&stmt
     return RC::INVALID_ARGUMENT;
   }
 
+  SelectStmt *select_stmt = nullptr;
   if (create_table.attr_infos.empty()) {
-    std::unique_ptr<Expression>& expr = create_table.select;
-    if (expr == nullptr) {
-      return RC::INVALID_ARGUMENT;
+    Stmt *select_stmt_t = nullptr;
+    RC    rc            = SelectStmt::create(db, create_table.select, select_stmt_t);
+    if (rc != RC::SUCCESS) {
+      return rc;
     }
-    BinderContext context;
-    context.set_db(db);
-    ExpressionBinder binder(context);
-    std::vector<std::unique_ptr<Expression>> exprs;
-    if (RC::SUCCESS != binder.bind_expression(expr, exprs)) {
-      return RC::INVALID_ARGUMENT;
+    select_stmt = dynamic_cast<SelectStmt *>(select_stmt_t);
+    rc          = select_stmt->get_attr_infos(create_table.attr_infos);
+    if (rc != RC::SUCCESS) {
+      return rc;
     }
-
-
   }
 
-  stmt = new CreateTableStmt(create_table.relation_name, create_table.attr_infos, storage_format);
-  sql_debug("create table statement: table name %s", create_table.relation_name.c_str());
+  stmt = new CreateTableStmt(create_table.relation_name, create_table.attr_infos, select_stmt, storage_format);
   return RC::SUCCESS;
 }
 
-StorageFormat CreateTableStmt::get_storage_format(const char *format_str) {
+StorageFormat CreateTableStmt::get_storage_format(const char *format_str)
+{
   StorageFormat format = StorageFormat::UNKNOWN_FORMAT;
   if (0 == strcasecmp(format_str, "ROW")) {
     format = StorageFormat::ROW_FORMAT;
