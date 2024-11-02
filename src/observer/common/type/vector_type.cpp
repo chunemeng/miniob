@@ -239,3 +239,12 @@ float VectorType::inner_product_helper(const float *left, const float *right, in
   }
   return sum;
 }
+RC VectorType::set_value_from_str(Value &val, const string &data) const
+{
+  Value tmp;
+
+  tmp.set_string(data.c_str() + 1, data.length() - 2);
+  Value::cast_to(tmp, AttrType::VECTORS, val);
+
+  return RC::SUCCESS;
+}

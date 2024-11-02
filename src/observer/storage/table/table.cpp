@@ -30,6 +30,7 @@ See the Mulan PSL v2 for more details. */
 #include "storage/record/record_manager.h"
 #include "storage/table/table.h"
 #include "storage/trx/trx.h"
+#include "storage/index/ivfflat_index.h"
 
 Table::~Table()
 {
@@ -240,8 +241,21 @@ RC Table::open(Db *db, const char *meta_file, const char *base_dir)
       return RC::INTERNAL;
     }
 
-    BplusTreeIndex *index      = new BplusTreeIndex();
-    string          index_file = table_index_file(base_dir, name(), index_meta->name());
+    Index *index = nullptr;
+
+    if (index_meta->type() == IndexType::BTREE) {
+      index = new BplusTreeIndex();
+    } else if (index_meta->type() == IndexType::IVF) {
+      index = new IvfflatIndex();
+    } else {
+      LOG_ERROR("Failed to open index. table=%s, index=%s, type=%d",
+                name().c_str(), index_meta->name(), index_meta->type());
+      // skip cleanup
+      //  do all cleanup action in destructive Table function.
+      return RC::INTERNAL;
+    }
+
+    string index_file = table_index_file(base_dir, name(), index_meta->name());
 
     rc = index->open(this, index_file.c_str(), *index_meta, field_meta);
     if (rc != RC::SUCCESS) {
@@ -418,8 +432,7 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
 
   const int normal_field_start_index = table_meta_.sys_field_num();
   // 复制所有字段的值
-  int record_size = table_meta_.record_size();
-  LOG_INFO("record size: %d", record_size);
+  int   record_size = table_meta_.record_size();
   char *record_data = (char *)malloc(record_size);
   memset(record_data, 0, record_size);
 
@@ -479,7 +492,7 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
             int pages = field->len() / static_cast<int>(sizeof(int));
             len       = real_value->length() * sizeof(float);
             LOG_INFO("field len: %d, value len: %d field real_len", field->len(), len, field->real_len());
-            auto bp   = std::launder(reinterpret_cast<int *>(record_data + field->offset()));
+            auto bp = std::launder(reinterpret_cast<int *>(record_data + field->offset()));
             for (int j = 0; j < pages; j++) {
               Frame *frame = nullptr;
               temp_buffer_pool_->allocate_page(&frame);
@@ -639,7 +652,7 @@ RC Table::create_index(Trx *trx, std::vector<const FieldMeta *> &field_meta, con
 
   IndexMeta new_index_meta;
 
-  RC rc = new_index_meta.init(index_name, field_meta, is_unique);
+  RC rc = new_index_meta.init(index_name, field_meta, is_unique, IndexType::BTREE);
   if (rc != RC::SUCCESS) {
     LOG_INFO("Failed to init IndexMeta in table:%s, index_name:%s",
              name().c_str(), index_name);
@@ -1060,4 +1073,111 @@ RC Table::read_from_big_page(char *data, int len, int *page_nums, int page_num) 
     memcpy(data + i * BP_PAGE_DATA_SIZE, page.data, std::min(len - i * BP_PAGE_DATA_SIZE, BP_PAGE_DATA_SIZE));
   }
   return RC::SUCCESS;
+}
+RC Table::create_vector_index(Trx *trx, int lists, int probs, DistanceType type, vector<const FieldMeta *> &field_meta,
+    const char *index_name, bool is_unique)
+{
+  if (common::is_blank(index_name) || field_meta.empty()) {
+    LOG_INFO("Invalid input arguments, table name is %s, index_name is blank or attribute_name is blank", name().c_str());
+    return RC::INVALID_ARGUMENT;
+  }
+  ASSERT(static_cast<int>(field_meta.size()) == 1 + table_meta_.null_field_num(), "field_meta size should be 1");
+
+  IndexMeta new_index_meta;
+
+  RC rc = new_index_meta.init(index_name, field_meta, is_unique, IndexType::IVF);
+  if (rc != RC::SUCCESS) {
+    LOG_INFO("Failed to init IndexMeta in table:%s, index_name:%s",
+             name().c_str(), index_name);
+    return rc;
+  }
+
+  // 创建索引相关数据
+  auto   index      = new IvfflatIndex();
+  string index_file = table_index_file(base_dir_.c_str(), name(), index_name);
+
+  rc = index->create(this, is_unique, index_file.c_str(), new_index_meta, field_meta);
+  if (rc != RC::SUCCESS) {
+    delete index;
+    LOG_ERROR("Failed to create bplus tree index. file name=%s, rc=%d:%s", index_file.c_str(), rc, strrc(rc));
+    return rc;
+  }
+
+  // 遍历当前的所有数据，插入这个索引
+  RecordFileScanner scanner;
+  rc = get_record_scanner(scanner, trx, ReadWriteMode::READ_ONLY);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to create scanner while creating index. table=%s, index=%s, rc=%s",
+             name().c_str(), index_name, strrc(rc));
+    return rc;
+  }
+
+  Record record;
+  while (OB_SUCC(rc = scanner.next(record))) {
+    rc = index->insert_entry(record.data(), &record.rid());
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to insert record into index while creating index. table=%s, index=%s, rc=%s",
+               name().c_str(), index_name, strrc(rc));
+      return rc;
+    }
+  }
+  if (RC::RECORD_EOF == rc) {
+    rc = RC::SUCCESS;
+  } else {
+    LOG_WARN("failed to insert record into index while creating index. table=%s, index=%s, rc=%s",
+             name().c_str(), index_name, strrc(rc));
+    return rc;
+  }
+  scanner.close_scan();
+  LOG_INFO("inserted all records into new index. table=%s, index=%s", name().c_str(), index_name);
+
+  rc = index->train(lists, probs, type);
+
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to train index. table=%s, index=%s, rc=%d:%s",
+              name().c_str(), index_name, rc, strrc(rc));
+    return rc;
+  }
+
+  indexes_.push_back(index);
+
+  /// 接下来将这个索引放到表的元数据中
+  TableMeta new_table_meta(table_meta_);
+  rc = new_table_meta.add_index(new_index_meta);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to add index (%s) on table (%s). error=%d:%s", index_name, name().c_str(), rc, strrc(rc));
+    return rc;
+  }
+
+  /// 内存中有一份元数据，磁盘文件也有一份元数据。修改磁盘文件时，先创建一个临时文件，写入完成后再rename为正式文件
+  /// 这样可以防止文件内容不完整
+  // 创建元数据临时文件
+  string  tmp_file = table_meta_file(base_dir_.c_str(), name()) + ".tmp";
+  fstream fs;
+  fs.open(tmp_file, ios_base::out | ios_base::binary | ios_base::trunc);
+  if (!fs.is_open()) {
+    LOG_ERROR("Failed to open file for write. file name=%s, errmsg=%s", tmp_file.c_str(), strerror(errno));
+    return RC::IOERR_OPEN;  // 创建索引中途出错，要做还原操作
+  }
+  if (new_table_meta.serialize(fs) < 0) {
+    LOG_ERROR("Failed to dump new table meta to file: %s. sys err=%d:%s", tmp_file.c_str(), errno, strerror(errno));
+    return RC::IOERR_WRITE;
+  }
+  fs.close();
+
+  // 覆盖原始元数据文件
+  string meta_file = table_meta_file(base_dir_.c_str(), name());
+
+  int ret = rename(tmp_file.c_str(), meta_file.c_str());
+  if (ret != 0) {
+    LOG_ERROR("Failed to rename tmp meta file (%s) to normal meta file (%s) while creating index (%s) on table (%s). "
+              "system error=%d:%s",
+              tmp_file.c_str(), meta_file.c_str(), index_name, name().c_str(), errno, strerror(errno));
+    return RC::IOERR_WRITE;
+  }
+
+  table_meta_.swap(new_table_meta);
+
+  LOG_INFO("Successfully added a new index (%s) on the table (%s)", index_name, name().c_str());
+  return rc;
 }

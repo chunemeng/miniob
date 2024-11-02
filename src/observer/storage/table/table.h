@@ -18,6 +18,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/types.h"
 #include "common/lang/span.h"
 #include "common/lang/functional.h"
+#include "storage/index/ivfflat_index.h"
 
 struct RID;
 class Record;
@@ -96,6 +97,8 @@ public:
   RC recover_insert_record(Record &record);
 
   RC create_index(Trx *trx, std::vector<const FieldMeta *> &field_meta, const char *index_name, bool is_unique);
+
+  RC create_vector_index(Trx *trx, int lists, int probs, DistanceType type, std::vector<const FieldMeta *> &field_meta, const char *index_name, bool is_unique);
 
   RC get_record_scanner(RecordFileScanner &scanner, Trx *trx, ReadWriteMode mode);
 

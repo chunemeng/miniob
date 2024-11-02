@@ -24,6 +24,13 @@ namespace Json {
 class Value;
 }  // namespace Json
 
+enum class IndexType
+{
+  INVALID = 0,
+  BTREE,
+  IVF,
+};
+
 /**
  * @brief 描述一个索引
  * @ingroup Index
@@ -35,13 +42,14 @@ class IndexMeta
 public:
   IndexMeta() = default;
 
-  RC init(const char *name, std::vector<const FieldMeta *> &fields, bool is_unique);
-  RC init(const char *name, std::vector<std::string> &fields, bool is_unique);
+  RC init(const char *name, std::vector<const FieldMeta *> &fields, bool is_unique, IndexType type);
+  RC init(const char *name, std::vector<std::string> &fields, bool is_unique, IndexType type);
 
 public:
   const char                     *name() const;
   const std::vector<std::string> &field() const;
   bool                            is_unique() const;
+  IndexType                       type() const;
 
   void desc(ostream &os) const;
 
@@ -53,4 +61,5 @@ protected:
   string              name_;       // index's name
   std::vector<string> field_;      // field's name
   bool                is_unique_;  // is unique index
+  IndexType           type_;       // index type
 };

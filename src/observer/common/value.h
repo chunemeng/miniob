@@ -119,7 +119,7 @@ public:
   void     set_value(const Value &value);
   void     set_boolean(bool val);
   void     set_null(int len = 0);
-  void     set_vector(float *vec, int len);
+  void     set_vector(float *vec, int len, bool own_data = true);
   void     set_vector(std::vector<float> &vec);
 
   string to_string() const;

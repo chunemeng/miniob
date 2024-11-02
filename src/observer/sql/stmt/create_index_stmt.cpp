@@ -17,6 +17,8 @@ See the Mulan PSL v2 for more details. */
 #include "common/log/log.h"
 #include "storage/db/db.h"
 #include "storage/table/table.h"
+#include "sql/expr/expression.h"
+#include "storage/index/ivfflat_index.h"
 
 using namespace std;
 using namespace common;
@@ -61,12 +63,67 @@ RC CreateIndexStmt::create(Db *db, const CreateIndexSqlNode &create_index, Stmt 
     }
     index_fields.push_back(field_meta);
   }
+  if (create_index.is_vector) {
+    int          lists = 0, probs = 0;
+    DistanceType type = UNKNOWN;
+    if (create_index.expressions.size() != 4) {
+      LOG_WARN("invalid expression size. size=%d", create_index.expressions.size());
+      return RC::INVALID_ARGUMENT;
+    }
+    for (auto &expr : create_index.expressions) {
+      if (expr->type() != ExprType::COMPARISON) {
+        LOG_WARN("invalid expression type. type=%d", expr->type());
+        return RC::INVALID_ARGUMENT;
+      }
+      auto *comp_expr = dynamic_cast<ComparisonExpr *>(expr.get());
+      if (comp_expr->comp() != CompOp::EQUAL_TO) {
+        LOG_WARN("invalid expression op. op=%d", comp_expr->comp());
+        return RC::INVALID_ARGUMENT;
+      }
 
-  //  if (strcmp(create_index.index_name.c_str(), "index_id2") == 0) {
-  //    delete table;
-  //    delete table;
-  //  }
+      auto left = dynamic_cast<ValueExpr *>(comp_expr->left().get());
+      switch (left->get_value().get_int()) {
+        case 1:
+          if (lists != 0) {
+            LOG_WARN("invalid expression value. value=%d", left->get_value().get_int());
+            return RC::INVALID_ARGUMENT;
+          }
+          lists = dynamic_cast<ValueExpr *>(comp_expr->right().get())->get_value().get_int();
+          break;
+        case 2:
+          if (probs != 0) {
+            LOG_WARN("invalid expression value. value=%d", left->get_value().get_int());
+            return RC::INVALID_ARGUMENT;
+          }
+          probs = dynamic_cast<ValueExpr *>(comp_expr->right().get())->get_value().get_int();
+          break;
+        case 3:
+          if (type != UNKNOWN) {
+            LOG_WARN("invalid expression value. value=%d", left->get_value().get_int());
+            return RC::INVALID_ARGUMENT;
+          }
+          type = static_cast<DistanceType>(dynamic_cast<ValueExpr *>(comp_expr->right().get())->get_value().get_int());
+          break;
+        case 4: {
+          auto right = dynamic_cast<ValueExpr *>(comp_expr->right().get());
+          if (right == nullptr) {
+            LOG_WARN("invalid expression value. value=");
+            return RC::INVALID_ARGUMENT;
+          }
+          if (right->get_value().get_int() != 1) {
+            LOG_WARN("invalid expression value. value=%d", right->get_value().get_int());
+            return RC::INVALID_ARGUMENT;
+          }
+        } break;
+        default: return RC::INVALID_ARGUMENT;
+      }
+    }
+    stmt = new CreateIndexStmt(
+        table, index_fields, create_index.index_name, create_index.unique, true, lists, probs, type);
 
-  stmt = new CreateIndexStmt(table, index_fields, create_index.index_name, create_index.unique);
+  } else {
+    stmt = new CreateIndexStmt(table, index_fields, create_index.index_name, create_index.unique);
+  }
+
   return RC::SUCCESS;
 }

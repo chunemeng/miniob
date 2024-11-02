@@ -125,6 +125,9 @@ private:
       std::unique_ptr<Expression> &subquery_expr, std::vector<std::unique_ptr<Expression>> &bound_expressions);
   RC bind_star_expression(std::unique_ptr<Expression> &star_expr,
       std::vector<std::unique_ptr<Expression>> &bound_expressions, bool should_alis = false);
+
+  RC bind_vec_order_by_expression(std::unique_ptr<Expression> &unbound_star_expr,
+      std::vector<std::unique_ptr<Expression>> &bound_expressions, bool should_alis = false);
   RC bind_unbound_field_expression(std::unique_ptr<Expression> &unbound_field_expr,
       std::vector<std::unique_ptr<Expression>> &bound_expressions, bool should_alis = false);
   RC bind_order_by_expression(

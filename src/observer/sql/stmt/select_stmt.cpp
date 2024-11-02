@@ -127,6 +127,10 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
       return rc;
     }
   }
+  bool is_vector_scanner = false;
+  if (order_by_expressions.size() == 1 && order_by_expressions[0]->type() == ExprType::VEC_ORDER_BY) {
+    is_vector_scanner = true;
+  }
 
   // create filter statement in `where` statement
   FilterStmt *filter_stmt = nullptr;
@@ -152,7 +156,8 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   select_stmt->having_stmt_ = having_stmt;
   select_stmt->group_by_.swap(group_by_expressions);
   select_stmt->order_by_.swap(order_by_expressions);
-  stmt = select_stmt;
+  select_stmt->is_vector_scanner_ = is_vector_scanner;
+  stmt                            = select_stmt;
   return RC::SUCCESS;
 }
 RC SelectStmt::create(BinderContext &binder_context, SelectSqlNode &select_sql, Stmt *&stmt)

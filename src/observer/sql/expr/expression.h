@@ -40,16 +40,17 @@ enum class ExprType
   UNBOUND_FIELD,        ///< 未绑定的字段，需要在resolver阶段解析为FieldExpr
   UNBOUND_AGGREGATION,  ///< 未绑定的聚合函数，需要在resolver阶段解析为AggregateExpr
 
-  FIELD,        ///< 字段。在实际执行时，根据行数据内容提取对应字段的值
-  VALUE,        ///< 常量值
-  CAST,         ///< 需要做类型转换的表达式
-  COMPARISON,   ///< 需要做比较的表达式
-  CONJUNCTION,  ///< 多个表达式使用同一种关系(AND或OR)来联结
-  ARITHMETIC,   ///< 算术运算
-  VALUE_LIST,   ///< 值列表
-  SUBQUERY,     ///< 子查询
-  AGGREGATION,  ///< 聚合运算
-  ORDER_BY,     ///< 排序
+  FIELD,         ///< 字段。在实际执行时，根据行数据内容提取对应字段的值
+  VALUE,         ///< 常量值
+  CAST,          ///< 需要做类型转换的表达式
+  COMPARISON,    ///< 需要做比较的表达式
+  CONJUNCTION,   ///< 多个表达式使用同一种关系(AND或OR)来联结
+  ARITHMETIC,    ///< 算术运算
+  VALUE_LIST,    ///< 值列表
+  SUBQUERY,      ///< 子查询
+  AGGREGATION,   ///< 聚合运算
+  VEC_ORDER_BY,  ///< 向量排序
+  ORDER_BY,      ///< 排序
 };
 
 /**
@@ -171,6 +172,37 @@ private:
   bool        is_desc_;
 };
 
+class VecOrderByExpr : public Expression
+{
+public:
+  VecOrderByExpr(Expression *left, Expression *right, int distance_type, size_t limit)
+      : distance_type_(static_cast<DistanceType>(distance_type)), left_(left), right_(right), limit_(limit)
+  {}
+
+  virtual ~VecOrderByExpr() = default;
+
+  ExprType type() const override { return ExprType::VEC_ORDER_BY; }
+  AttrType value_type() const override { return AttrType::NULLS; }
+
+  RC get_value(const Tuple &tuple, Value &value) const override { return RC::INTERNAL; }
+
+  RC try_get_value(Value &value) const override
+  {
+    value.set_boolean(true);
+    return RC::SUCCESS;
+  }
+  DistanceType                 distance_type() const { return distance_type_; }
+  std::unique_ptr<Expression> &left() { return left_; }
+  std::unique_ptr<Expression> &right() { return right_; }
+  size_t                       limit() const { return limit_; }
+
+private:
+  DistanceType                distance_type_;
+  std::unique_ptr<Expression> left_;
+  std::unique_ptr<Expression> right_;
+  size_t                      limit_ = 0;
+};
+
 class StarExpr : public Expression
 {
 public:
@@ -289,36 +321,35 @@ public:
 
     RC rc    = RC::SUCCESS;
     is_init_ = true;
-      for (const auto &expr : children_) {
-        switch (expr->type()) {
-          case ExprType::VALUE: {
-            Value v;
-            rc = expr->try_get_value(v);
-            if (rc != RC::SUCCESS) {
-              return rc;
-            }
-            value_list_.emplace_back(v);
-            break;
+    for (const auto &expr : children_) {
+      switch (expr->type()) {
+        case ExprType::VALUE: {
+          Value v;
+          rc = expr->try_get_value(v);
+          if (rc != RC::SUCCESS) {
+            return rc;
           }
-          case ExprType::SUBQUERY: {
-            SubQueryExpr *subquery_expr = static_cast<SubQueryExpr *>(expr.get());
-
-            Value v;
-
-            while ((rc = subquery_expr->try_get_value_fun(v)) == RC::SUCCESS) {
-              value_list_.emplace_back(v);
-            }
-
-            if (rc != RC::RECORD_EOF) {
-              return rc;
-            }
-            rc = RC::SUCCESS;
-
-            break;
-          };
-          default: return RC::INTERNAL;
+          value_list_.emplace_back(v);
+          break;
         }
+        case ExprType::SUBQUERY: {
+          SubQueryExpr *subquery_expr = static_cast<SubQueryExpr *>(expr.get());
 
+          Value v;
+
+          while ((rc = subquery_expr->try_get_value_fun(v)) == RC::SUCCESS) {
+            value_list_.emplace_back(v);
+          }
+
+          if (rc != RC::RECORD_EOF) {
+            return rc;
+          }
+          rc = RC::SUCCESS;
+
+          break;
+        };
+        default: return RC::INTERNAL;
+      }
     }
     return rc;
   }
@@ -326,7 +357,7 @@ public:
   const std::vector<Value> &value_list() const { return value_list_; }
 
 private:
-  bool                                     is_init_    = false;
+  bool                                     is_init_ = false;
   std::vector<std::unique_ptr<Expression>> children_;
   std::vector<Value>                       value_list_;
 };

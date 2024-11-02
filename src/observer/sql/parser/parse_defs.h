@@ -20,6 +20,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "common/value.h"
 
+
 class Expression;
 
 /**
@@ -215,11 +216,14 @@ struct DropTableSqlNode
  */
 struct CreateIndexSqlNode
 {
-  bool                        is_unique;       ///< 是否唯一索引
-  std::string                 index_name;      ///< Index name
-  std::string                 relation_name;   ///< Relation name
-  std::vector<RelAttrSqlNode> attribute_list;  ///< Attribute name
-  bool                        unique = false;  ///< 是否是唯一索引
+  bool                        is_unique;          ///< 是否唯一索引
+  std::string                 index_name;         ///< Index name
+  std::string                 relation_name;      ///< Relation name
+  std::vector<RelAttrSqlNode> attribute_list;     ///< Attribute name
+  bool                        unique    = false;  ///< 是否是唯一索引
+  bool                        is_vector = false;
+
+  std::vector<std::unique_ptr<Expression>> expressions;  ///< attributes
 };
 
 /**

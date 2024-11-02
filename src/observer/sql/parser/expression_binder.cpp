@@ -108,6 +108,9 @@ RC ExpressionBinder::bind_expression(
     case ExprType::ORDER_BY: {
       return bind_order_by_expression(expr, bound_expressions);
     } break;
+    case ExprType::VEC_ORDER_BY: {
+      return bind_vec_order_by_expression(expr, bound_expressions);
+    } break;
 
     default: {
       LOG_WARN("unknown expression type: %d", static_cast<int>(expr->type()));
@@ -623,5 +626,39 @@ RC ExpressionBinder::bind_order_by_expression(
     table_name = context_.table_map().begin()->first;
   }
   bound_expressions.emplace_back(std::move(order_by_expr));
+  return RC::SUCCESS;
+}
+RC ExpressionBinder::bind_vec_order_by_expression(
+    unique_ptr<Expression> &unbound_star_expr, vector<std::unique_ptr<Expression>> &bound_expressions, bool should_alis)
+{
+  if (nullptr == unbound_star_expr) {
+    return RC::SUCCESS;
+  }
+
+  auto expr = static_cast<VecOrderByExpr *>(unbound_star_expr.get());
+
+  std::vector<std::unique_ptr<Expression>> bound_expression;
+  RC                                       rc = bind_expression(expr->left(), bound_expression);
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
+  if (bound_expression.size() != 1) {
+    LOG_WARN("invalid left children number of comparison expression: %d", bound_expression.size());
+    return RC::INVALID_ARGUMENT;
+  }
+  expr->left() = std::move(bound_expression[0]);
+  bound_expression.clear();
+  rc = bind_expression(expr->right(), bound_expression);
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
+  if (bound_expression.size() != 1) {
+    LOG_WARN("invalid right children number of comparison expression: %d", bound_expression.size());
+    return RC::INVALID_ARGUMENT;
+  }
+  expr->right() = std::move(bound_expression[0]);
+  bound_expression.clear();
+
+  bound_expressions.emplace_back(std::move(unbound_star_expr));
   return RC::SUCCESS;
 }

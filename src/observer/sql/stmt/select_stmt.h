@@ -54,6 +54,8 @@ public:
 
   RC get_attr_infos(std::vector<AttrInfoSqlNode> &field_meta);
 
+  bool is_vector_scanner() const { return is_vector_scanner_; }
+
 private:
   std::vector<std::unique_ptr<Expression>> query_expressions_;
   std::vector<Table *>                     tables_;
@@ -61,4 +63,5 @@ private:
   FilterStmt                              *having_stmt_ = nullptr;
   std::vector<std::unique_ptr<Expression>> order_by_;
   std::vector<std::unique_ptr<Expression>> group_by_;
+  bool                                     is_vector_scanner_ = false;
 };

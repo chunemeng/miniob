@@ -101,8 +101,16 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   unique_ptr<LogicalOperator> *last_oper = &table_oper;
 
   const auto &tables = select_stmt->tables();
+  bool        once   = true;
   for (auto table : tables) {
     unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, ReadWriteMode::READ_ONLY));
+    if (select_stmt->is_vector_scanner() && once) {
+      auto ptr = dynamic_cast<TableGetLogicalOperator *>(table_get_oper.get());
+      ptr->set_vector_scanner(true);
+      ptr->set_vector_scan_expr(std::move(select_stmt->order_by()[0]));
+      once = false;
+      select_stmt->order_by().clear();
+    }
     if (table_oper == nullptr) {
       table_oper = std::move(table_get_oper);
     } else {
@@ -162,7 +170,12 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
 
   std::unique_ptr<LogicalOperator> order_by_oper;
   if (!select_stmt->order_by().empty()) {
-    order_by_oper = std::make_unique<OrderByLogicalOperator>(select_stmt->order_by());
+    if (select_stmt->order_by().size() == 1 && select_stmt->order_by()[0]->type() == ExprType::VEC_ORDER_BY) {
+
+    } else {
+      order_by_oper = std::make_unique<OrderByLogicalOperator>(select_stmt->order_by());
+    }
+
     if (*last_oper) {
       LOG_INFO("add order by oper");
       order_by_oper->add_child(std::move(*last_oper));
@@ -341,18 +354,15 @@ RC LogicalPlanGenerator::create_group_by_plan(SelectStmt *select_stmt, unique_pt
     collector(expression);
   }
 
-    auto &having_stmt = select_stmt->having_stmt()->filter_units();
+  auto &having_stmt = select_stmt->having_stmt()->filter_units();
 
-    if (having_stmt != nullptr) {
-      bind_group_by_expr(having_stmt);
+  if (having_stmt != nullptr) {
+    bind_group_by_expr(having_stmt);
 
-      find_unbound_column(having_stmt);
+    find_unbound_column(having_stmt);
 
-      collector(having_stmt);
-    }
-
-
-
+    collector(having_stmt);
+  }
 
   if (group_by_expressions.empty() && aggregate_expressions.empty()) {
     // 既没有group by也没有聚合函数，不需要group by

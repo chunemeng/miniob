@@ -22,8 +22,9 @@ See the Mulan PSL v2 for more details. */
 const static Json::StaticString FIELD_NAME("name");
 const static Json::StaticString FIELD_FIELD_NAME("field_name");
 const static Json::StaticString FIELD_UNIQUE("unique");
+const static Json::StaticString FIELD_TYPE("type");
 
-RC IndexMeta::init(const char *name, std::vector<const FieldMeta *> &fields, bool is_unique)
+RC IndexMeta::init(const char *name, std::vector<const FieldMeta *> &fields, bool is_unique, IndexType type)
 {
   if (common::is_blank(name)) {
     LOG_ERROR("Failed to init index, name is empty.");
@@ -34,6 +35,7 @@ RC IndexMeta::init(const char *name, std::vector<const FieldMeta *> &fields, boo
   for (const FieldMeta *field : fields) {
     field_.push_back(field->name());
   }
+  type_ = type;
 
   return RC::SUCCESS;
 }
@@ -47,6 +49,7 @@ void IndexMeta::to_json(Json::Value &json_value) const
   }
   json_value[FIELD_UNIQUE]     = is_unique_;
   json_value[FIELD_FIELD_NAME] = std::move(fields_value);
+  json_value[FIELD_TYPE]       = static_cast<int>(type_);
 }
 
 RC IndexMeta::from_json(const TableMeta &table, const Json::Value &json_value, IndexMeta &index)
@@ -54,6 +57,11 @@ RC IndexMeta::from_json(const TableMeta &table, const Json::Value &json_value, I
   const Json::Value &name_value   = json_value[FIELD_NAME];
   const Json::Value &unique_value = json_value[FIELD_UNIQUE];
   if (!unique_value.isBool()) {
+    LOG_ERROR("Index name is not a string. json value=%s", name_value.toStyledString().c_str());
+    return RC::INTERNAL;
+  }
+  const Json::Value &type_value = json_value[FIELD_TYPE];
+  if (!type_value.isInt()) {
     LOG_ERROR("Index name is not a string. json value=%s", name_value.toStyledString().c_str());
     return RC::INTERNAL;
   }
@@ -80,7 +88,8 @@ RC IndexMeta::from_json(const TableMeta &table, const Json::Value &json_value, I
         return RC::SCHEMA_FIELD_MISSING;
       }
     }
-    return index.init(name_value.asCString(), fields, unique_value.asBool());
+    return index.init(
+        name_value.asCString(), fields, unique_value.asBool(), static_cast<IndexType>(type_value.asInt()));
   }
 
   return RC::INTERNAL;
@@ -99,7 +108,7 @@ void IndexMeta::desc(ostream &os) const
     os << field << ", ";
   }
 }
-RC IndexMeta::init(const char *name, vector<std::string> &fields, bool is_unique)
+RC IndexMeta::init(const char *name, vector<std::string> &fields, bool is_unique, IndexType type)
 {
   if (common::is_blank(name)) {
     LOG_ERROR("Failed to init index, name is empty.");
@@ -107,6 +116,8 @@ RC IndexMeta::init(const char *name, vector<std::string> &fields, bool is_unique
   }
   is_unique_ = is_unique;
   name_      = name;
+  type_      = type;
   field_     = std::move(fields);
   return RC::SUCCESS;
 }
+IndexType IndexMeta::type() const { return type_; }

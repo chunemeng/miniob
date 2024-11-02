@@ -125,6 +125,7 @@ UnboundAggregateExpr *create_aggregate_expression(AggrType aggregate_name,
         RBRACKET
         GROUP
         ORDER
+        LIMIT
         HAVING
         UNIQUE
         TABLE
@@ -135,6 +136,8 @@ UnboundAggregateExpr *create_aggregate_expression(AggrType aggregate_name,
         EXISTS
         DESC
         ASC
+        TYPE
+        DISTANCE
         SHOW
         SYNC
         INSERT
@@ -157,6 +160,10 @@ UnboundAggregateExpr *create_aggregate_expression(AggrType aggregate_name,
         DOT //QUOTE
         INTO
         VALUES
+        WITH
+        IVFFLAT
+        LISTS
+        PROBS
         FROM
         SUM
         AVG
@@ -227,6 +234,7 @@ UnboundAggregateExpr *create_aggregate_expression(AggrType aggregate_name,
 %type <expression>          condition
 %type <vec_list>            v_list
 %type <vec_list>            v_l
+%type <number>              distance_type
 %type <value>               value
 %type <string>              as_opt
 %type <number>              number
@@ -235,6 +243,8 @@ UnboundAggregateExpr *create_aggregate_expression(AggrType aggregate_name,
 %type <sql_node>          as_select_opt
 %type <number>              order_opt
 %type <expression>          order_b
+%type <expression>          vec_index_param
+%type <expression_list>     vec_index_list
 %type <expression_list>     order_by
 %type <expression_list>     order_by_list
 %type <expression_list>     assign_list
@@ -381,10 +391,78 @@ unique_op:
     }
     ;
 
+    distance_type:
+    L2_DIST {
+      $$ = 1;
+    }
+        | INNER_PRODUCT {
+          $$ = 2;
+        }
+    | COS_DIST {
+      $$ = 3;
+    }
+
+    ;
+
+vec_index_param:
+    DISTANCE EQ  distance_type{
+    Value val((int)($3));
+                Value valf((int)3);
+
+      $$ = create_comparison_expression(EQUAL_TO, new ValueExpr(valf), new ValueExpr(val), sql_string, &@$);
+    }
+    | LISTS EQ number {
+        Value val((int)($3));
+            Value valf((int)1);
+        $$ = create_comparison_expression(EQUAL_TO, new ValueExpr(valf), new ValueExpr(val), sql_string, &@$);
+    }
+    | PROBS EQ number {
+       Value val((int)($3));
+        Value valf((int)2);
+        $$ = create_comparison_expression(EQUAL_TO, new ValueExpr(valf), new ValueExpr(val), sql_string, &@$);
+    }
+    | TYPE EQ IVFFLAT {
+        Value valf((int)4);
+        Value val((int)(1));
+        $$ = create_comparison_expression(EQUAL_TO, new ValueExpr(valf), new ValueExpr(val), sql_string, &@$);
+    }
+    ;
+
+    vec_index_list:
+    vec_index_param {
+      $$ = new std::vector<std::unique_ptr<Expression>>;
+      $$->emplace_back($1);
+    }
+    | vec_index_param COMMA vec_index_list {
+      if ($3 != nullptr) {
+        $$ = $3;
+      } else {
+        $$ = new std::vector<std::unique_ptr<Expression>>;
+      }
+      $$->emplace($$->begin(), $1);
+    }
+    ;
+
 
 
 create_index_stmt:    /*create index 语句的语法解析树*/
-    CREATE unique_op INDEX ID ON ID LBRACE rel_list RBRACE
+    CREATE VECTOR_T INDEX ID ON ID LBRACE rel_list RBRACE WITH LBRACE vec_index_list RBRACE
+    {
+      $$ = new ParsedSqlNode(SCF_CREATE_INDEX);
+      CreateIndexSqlNode &create_index = $$->create_index;
+      create_index.index_name = $4;
+      create_index.relation_name = $6;
+      create_index.unique = false;
+      create_index.is_vector = true;
+      create_index.attribute_list = std::move(*$8);
+      create_index.expressions = std::move(*$12);
+      free($4);
+      free($6);
+      delete($8);
+      delete($12);
+    }
+
+    | CREATE unique_op INDEX ID ON ID LBRACE rel_list RBRACE
     {
       $$ = new ParsedSqlNode(SCF_CREATE_INDEX);
       CreateIndexSqlNode &create_index = $$->create_index;
@@ -702,6 +780,10 @@ order_b:
     {
       $$ = new OrderByExpr($1->relation_name, $1->attribute_name, $2);
       delete $1;
+    }
+    | distance_type LBRACE expression COMMA expression RBRACE LIMIT number
+    {
+      $$ = new VecOrderByExpr($3,$5,$1, $8);
     }
     ;
 

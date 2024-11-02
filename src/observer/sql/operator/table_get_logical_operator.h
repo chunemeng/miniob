@@ -34,11 +34,19 @@ public:
   ReadWriteMode read_write_mode() const { return mode_; }
 
   void set_predicates(std::vector<std::unique_ptr<Expression>> &&exprs);
+  bool is_vector_scanner() const { return is_vector_scanner_; }
+  void set_vector_scanner(bool is_vector_scanner) { is_vector_scanner_ = is_vector_scanner; }
+
+  void set_vector_scan_expr(std::unique_ptr<Expression> &&expr) { vector_scan_expr_ = std::move(expr); }
+  auto vector_scan_expr() -> std::unique_ptr<Expression> & { return vector_scan_expr_; }
   auto predicates() -> std::vector<std::unique_ptr<Expression>> & { return predicates_; }
 
 private:
-  Table        *table_ = nullptr;
-  ReadWriteMode mode_  = ReadWriteMode::READ_WRITE;
+  Table        *table_             = nullptr;
+  ReadWriteMode mode_              = ReadWriteMode::READ_WRITE;
+  bool          is_vector_scanner_ = false;
+
+  std::unique_ptr<Expression> vector_scan_expr_;
 
   // 与当前表相关的过滤操作，可以尝试在遍历数据时执行
   // 这里的表达式都是比较简单的比较运算，并且左右两边都是取字段表达式或值表达式

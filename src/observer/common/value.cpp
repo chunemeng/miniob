@@ -174,11 +174,11 @@ void Value::set_int(int val)
   length_           = sizeof(val);
 }
 
-void Value::set_vector(float *vec, int len)
+void Value::set_vector(float *vec, int len, bool own_data /*= true*/)
 {
   reset();
   attr_type_           = AttrType::VECTORS;
-  own_data_            = true;
+  own_data_            = own_data;
   length_              = len;
   value_.vector_value_ = vec;
 }
