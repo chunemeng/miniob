@@ -39,6 +39,7 @@ enum class PhysicalOperatorType
   TABLE_SCAN,
   VECTOR_INDEX_SCAN,
   TABLE_SCAN_VEC,
+  LIMIT,
   INDEX_SCAN,
   NESTED_LOOP_JOIN,
   EXPLAIN,

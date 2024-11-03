@@ -48,6 +48,9 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/update_physical_operator.h"
 #include "sql/operator/order_by_logical_operator.h"
 #include "sql/operator/order_by_physical_operator.h"
+#include "sql/operator/limit_logical_operator.h"
+#include "sql/operator/limit_physical_operator.h"
+#include "sql/operator/vec_order_by_logical_operator.h"
 
 using namespace std;
 
@@ -97,6 +100,12 @@ RC PhysicalPlanGenerator::create(LogicalOperator &logical_operator, unique_ptr<P
     case LogicalOperatorType::ORDER_BY: {
       return create_plan(static_cast<OrderByLogicalOperator &>(logical_operator), oper);
     } break;
+    case LogicalOperatorType::LIMIT: {
+      return create_plan(static_cast<LimitLogicalOperator &>(logical_operator), oper);
+    }
+    case LogicalOperatorType::VEC_ORDER_BY: {
+      return create_plan(static_cast<VecOrderByLogicalOperator &>(logical_operator), oper);
+    }
 
     default: {
       ASSERT(false, "unknown logical operator type");
@@ -560,6 +569,72 @@ RC PhysicalPlanGenerator::create_plan(OrderByLogicalOperator &logical_oper, uniq
     }
   }
   oper = std::make_unique<OrderByPhysicalOperator>(logical_oper.order_by_expressions());
+
+  if (child_physical_oper) {
+    oper->add_child(std::move(child_physical_oper));
+  }
+
+  return rc;
+}
+RC PhysicalPlanGenerator::create_plan(LimitLogicalOperator &logical_oper, unique_ptr<PhysicalOperator> &oper)
+{
+  vector<unique_ptr<LogicalOperator>> &child_opers = logical_oper.children();
+
+  unique_ptr<PhysicalOperator> child_physical_oper;
+
+  RC rc = RC::SUCCESS;
+  if (!child_opers.empty()) {
+    LogicalOperator *child_oper = child_opers.front().get();
+
+    rc = create(*child_oper, child_physical_oper);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to create physical operator. rc=%s", strrc(rc));
+      return rc;
+    }
+  }
+  oper = std::make_unique<LimitPhysicalOperator>(logical_oper.limit());
+
+  if (child_physical_oper) {
+    oper->add_child(std::move(child_physical_oper));
+  }
+
+  return rc;
+}
+RC PhysicalPlanGenerator::create_plan(VecOrderByLogicalOperator &logical_oper, unique_ptr<PhysicalOperator> &oper)
+{
+  vector<unique_ptr<LogicalOperator>> &child_opers = logical_oper.children();
+
+  unique_ptr<PhysicalOperator> child_physical_oper;
+
+  RC rc = RC::SUCCESS;
+  if (!child_opers.empty()) {
+    LogicalOperator *child_oper = child_opers.front().get();
+
+    rc = create(*child_oper, child_physical_oper);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to create physical operator. rc=%s", strrc(rc));
+      return rc;
+    }
+  }
+  if (logical_oper.order_by_expressions().size() != 2) {
+    LOG_WARN("order by expressions size should be 2");
+    return RC::INVALID_ARGUMENT;
+  }
+
+  auto expr = std::move(logical_oper.order_by_expressions()[1]);
+  logical_oper.order_by_expressions().pop_back();
+
+  auto field_expr    = dynamic_cast<FieldExpr *>(logical_oper.order_by_expressions()[0].get());
+  auto order_by_expr = std::make_unique<OrderByExpr>(field_expr->table_name(), field_expr->field_name(), false);
+  logical_oper.order_by_expressions()[0] = std::move(order_by_expr);
+
+  std::unique_ptr<OrderByPhysicalOperator> oprr =
+      std::make_unique<OrderByPhysicalOperator>(logical_oper.order_by_expressions());
+  Value v;
+  expr->try_get_value(v);
+  oprr->set_calc(v, logical_oper.distance_type());
+
+  oper = std::move(oprr);
 
   if (child_physical_oper) {
     oper->add_child(std::move(child_physical_oper));

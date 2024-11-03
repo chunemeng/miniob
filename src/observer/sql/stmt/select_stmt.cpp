@@ -42,7 +42,6 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   binder_context.set_db(db);
 
   // collect tables in `from` statement
-  vector<Table *> tables;
   for (size_t i = 0; i < select_sql.relations.size(); i++) {
     const auto &table_name = select_sql.relations[i];
     if (table_name.relation_name.empty()) {
@@ -129,7 +128,29 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   }
   bool is_vector_scanner = false;
   if (order_by_expressions.size() == 1 && order_by_expressions[0]->type() == ExprType::VEC_ORDER_BY) {
-    is_vector_scanner = true;
+    auto                   &expr              = order_by_expressions[0];
+    VecOrderByExpr         *vec_order_by_expr = dynamic_cast<VecOrderByExpr *>(expr.get());
+    unique_ptr<Expression> &left_expr         = vec_order_by_expr->left();
+    unique_ptr<Expression> &right_expr        = vec_order_by_expr->right();
+    auto                   &tables            = binder_context.table_ordered();
+    // 左右比较的一边最少是一个值
+    if ((left_expr->type() != ExprType::VALUE && right_expr->type() != ExprType::VALUE) && tables.size() != 1) {
+      return RC::INVALID_ARGUMENT;
+    }
+
+    FieldExpr *field_expr = nullptr;
+    if (left_expr->type() == ExprType::FIELD) {
+      ASSERT(right_expr->type() == ExprType::VALUE, "right expr should be a value expr while left is field expr");
+      field_expr = static_cast<FieldExpr *>(left_expr.get());
+    } else if (right_expr->type() == ExprType::FIELD) {
+      ASSERT(left_expr->type() == ExprType::VALUE, "left expr should be a value expr while right is a field expr");
+      field_expr = static_cast<FieldExpr *>(right_expr.get());
+      left_expr.swap(right_expr);
+    }
+    const Field &field = field_expr->field();
+    Index       *index = tables[0]->find_index_by_field(field.field_name().c_str());
+
+    is_vector_scanner = index != nullptr && index->index_meta().type() == IndexType::IVF;
   }
 
   // create filter statement in `where` statement

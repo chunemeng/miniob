@@ -145,7 +145,7 @@ private:
 class OrderByExpr : public Expression
 {
 public:
-  OrderByExpr(std::string &relation_name, std::string field_name, bool is_desc)
+  OrderByExpr(const std::string &relation_name, const std::string &field_name, bool is_desc)
       : relation_name_(relation_name), field_name_(field_name), is_desc_(is_desc)
   {}
   virtual ~OrderByExpr() = default;
@@ -160,16 +160,20 @@ public:
     return RC::SUCCESS;
   }
 
+  void set_limit(size_t limit) { limit_ = limit; }
+
   std::string &get_table_name() { return relation_name_; }
 
   const std::string &table_name() const { return relation_name_; }
   const std::string &field_name() const { return field_name_; }
   bool               is_desc() const { return is_desc_; }
+  size_t             limit() const { return limit_; }
 
 private:
   std::string relation_name_;
   std::string field_name_;
   bool        is_desc_;
+  size_t      limit_ = 0;
 };
 
 class VecOrderByExpr : public Expression

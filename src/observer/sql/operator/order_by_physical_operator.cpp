@@ -67,7 +67,6 @@ RC OrderByPhysicalOperator::open(Trx *trx)
         for (size_t i = 0; i < cell_indexs.size(); i++) {
           const Value &left  = a[cell_indexs[i]];
           const Value &right = b[cell_indexs[i]];
-          result             = left.compare(right);
           expressions[i]->try_get_value(desc);
           if (left.attr_type() == AttrType::NULLS) {
             if (right.attr_type() == AttrType::NULLS) {
@@ -77,6 +76,14 @@ RC OrderByPhysicalOperator::open(Trx *trx)
           }
           if (right.attr_type() == AttrType::NULLS) {
             return desc.get_boolean();
+          }
+          if (calc_) {
+            Value lv, rv;
+            calc_->operator()(left, lv);
+            calc_->operator()(right, rv);
+            result = lv.compare(rv);
+          } else {
+            result = left.compare(right);
           }
 
           if (result != 0) {
