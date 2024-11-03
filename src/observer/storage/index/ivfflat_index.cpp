@@ -245,6 +245,7 @@ RC IvfflatIndexHandler::train(int lists, int probes, DistanceType distance_type)
   int             times = 6;
   DataFileScanner scanner;
   int             init = 0;
+  LOG_INFO("Start to train index.");
   for (int ii = 0; ii < times; ii++) {
     RC rc = scanner.open_scan(*disk_buffer_pool_, *log_handler_, ReadWriteMode::READ_ONLY);
 
@@ -288,6 +289,8 @@ RC IvfflatIndexHandler::train(int lists, int probes, DistanceType distance_type)
     scanner.close_scan();
   }
 
+  LOG_INFO("Start to insert record into cluster.");
+
   RC rc = ivf_file_handler_.insert_cluster_record(last);
 
   if (rc != RC::SUCCESS) {
@@ -295,6 +298,7 @@ RC IvfflatIndexHandler::train(int lists, int probes, DistanceType distance_type)
     return rc;
   }
 
+  LOG_INFO("Successfully insert cluster");
   rc = scanner.open_scan(*disk_buffer_pool_, *log_handler_, ReadWriteMode::READ_ONLY);
 
   if (rc != RC::SUCCESS) {
@@ -302,8 +306,13 @@ RC IvfflatIndexHandler::train(int lists, int probes, DistanceType distance_type)
     return rc;
   }
 
+  LOG_INFO("Start to insert record into bucket.");
   Record record;
+  int    index = 0;
   while (OB_SUCC(rc = scanner.next(record))) {
+    if (index++ % 1000 == 0) {
+      LOG_INFO("insert record index=%d", index);
+    }
     auto  data = reinterpret_cast<float *>(record.data() + offset);
     float dis  = std::numeric_limits<float>::max();
     int   off  = 0;

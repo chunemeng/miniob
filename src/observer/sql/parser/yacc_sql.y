@@ -134,7 +134,9 @@ UnboundAggregateExpr *create_aggregate_expression(AggrType aggregate_name,
         CALC
         SELECT
         EXISTS
+        NAMES
         DESC
+        COLLATE
         ASC
         TYPE
         DISTANCE
@@ -153,6 +155,7 @@ UnboundAggregateExpr *create_aggregate_expression(AggrType aggregate_name,
         VECTOR_T
         TEXT_T
         STRING_T
+        UTF8MB4_BIN
         DATE_T
         FLOAT_T
         HELP
@@ -547,6 +550,7 @@ create_table_stmt:    /*create table 语句的语法解析树*/
          free($5);
        }
      }
+
     ;
 attr_def_list:
     /* empty */
@@ -1297,6 +1301,18 @@ set_variable_stmt:
       $$->set_variable.value = *$4;
       free($2);
       delete $4;
+    }
+    |SET NAMES SSS
+    {
+      $$ = new ParsedSqlNode(SCF_SET_VARIABLE);
+      $$->set_variable.name = "NAMES";
+      $$->set_variable.value = Value($3);
+      free($3);
+    }
+    | SET NAMES UTF8MB4_BIN
+    {
+      $$ = new ParsedSqlNode(SCF_SET_VARIABLE);
+      $$->set_variable.name = "NAMES";
     }
     ;
 
