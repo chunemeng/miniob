@@ -29,10 +29,9 @@ struct ClusterPage
  */
 struct IvfBucketPage
 {
-  static constexpr int BUCKET_SIZE = (BP_PAGE_DATA_SIZE - sizeof(int) - sizeof(PageNum)) / sizeof(RID);
-  PageNum              next_page_num;
-  int                  size;
-  RID                  data[0];
+  PageNum next_page_num;
+  int     size;
+  char    data[0];
 };
 
 // this store the current end page of the bucket page
@@ -229,7 +228,7 @@ struct IvfFileHandler
    * @param record_size 记录大小
    * @param rid         返回该记录的标识符
    */
-  RC insert_record_into_bucket(const RID *rid, int offset);
+  RC insert_record_into_bucket(const Record& record, int offset);
 
   std::vector<RID> ann_search(const vector<float> &base_vector, DistanceType type, size_t limit);
 
@@ -259,6 +258,8 @@ struct IvfFileHandler
   PageNum          offset_page_num_         = 0;
   int              cluster_record_per_page_ = 0;
   int              data_offset_             = 0;
+  int              record_size_             = 0;
+  int              bucket_size_             = 0;
   DistanceCalc     dis_calc_;
   StorageFormat    storage_format_;
   LogHandler      *log_handler_       = nullptr;  /// 日志处理器
