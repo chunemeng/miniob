@@ -269,22 +269,27 @@ struct IvfFileHandler
     if (disk_buffer_pool_ != nullptr) {
       disk_buffer_pool_->close_file();
     }
+
+    for (auto &cluster : cluster_cache_) {
+      delete[] cluster;
+    }
   }
 
-  int              list_;
-  int              dim_;
-  int              probes_;
-  PageNum          offset_page_num_         = 0;
-  int              cluster_record_per_page_ = 0;
-  int              data_offset_             = 0;
-  int              record_size_             = 0;
-  int              bucket_size_             = 0;
-  bool             is_cached_all_           = false;
-  DistanceCalc     dis_calc_;
-  StorageFormat    storage_format_;
-  LogHandler      *log_handler_       = nullptr;  /// 日志处理器
-  DiskBufferPool  *disk_buffer_pool_  = nullptr;  /// 磁盘缓冲池
-  DataFileHandler *data_file_handler_ = nullptr;
+  int                  list_;
+  int                  dim_;
+  int                  probes_;
+  PageNum              offset_page_num_         = 0;
+  int                  cluster_record_per_page_ = 0;
+  int                  data_offset_             = 0;
+  int                  record_size_             = 0;
+  int                  bucket_size_             = 0;
+  bool                 is_cached_all_           = false;
+  DistanceCalc         dis_calc_;
+  StorageFormat        storage_format_;
+  std::vector<float *> cluster_cache_;
+  LogHandler          *log_handler_       = nullptr;  /// 日志处理器
+  DiskBufferPool      *disk_buffer_pool_  = nullptr;  /// 磁盘缓冲池
+  DataFileHandler     *data_file_handler_ = nullptr;
 };
 
 // NOTE: 数据页，用于存储所有的数据

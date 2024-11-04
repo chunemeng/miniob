@@ -863,6 +863,7 @@ RC IvfFileHandler::insert_cluster_record(std::vector<std::vector<float>> &data)
   cluster_record_per_page_ = (BP_PAGE_DATA_SIZE) / record_size;
 
   int page_num = (list_ + cluster_record_per_page_ - 1) / cluster_record_per_page_;
+  cluster_cache_.resize(data.size());
 
   for (int i = 0; i < page_num; ++i) {
     Frame *frame = nullptr;
@@ -879,6 +880,9 @@ RC IvfFileHandler::insert_cluster_record(std::vector<std::vector<float>> &data)
       }
       char *pdata = frame->data() + j * record_size;
       memcpy(pdata, data[i * cluster_record_per_page_ + j].data(), record_size);
+      float *p = new float[dim_];
+      memcpy(p, pdata, record_size);
+      cluster_cache_[i * cluster_record_per_page_ + j] = p;
     }
     frame->mark_dirty();
     frame->unpin();
@@ -1012,6 +1016,7 @@ RC IvfFileHandler::init_vec_info(int dim, int lists, int probes, DistanceType di
   data_file_handler_       = &handler;
   int record_size          = dim_ * sizeof(float);
   cluster_record_per_page_ = (BP_PAGE_DATA_SIZE) / record_size;
+  cluster_cache_.resize(0);
 
   record_size_ = dim_ * sizeof(float) + sizeof(RID);
 
@@ -1146,24 +1151,35 @@ std::vector<RID> IvfFileHandler::ann_search_p(const float *base_vector, Distance
   dis_calc.init(type);
 
   for (int i = 0; i < list_; i++) {
-    Frame *frame = nullptr;
-    RC     rc    = disk_buffer_pool_->get_this_page(FIRST_INDEX_PAGE + i / cluster_record_per_page_, &frame);
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("Failed to get page while inserting record. ret:%d", rc);
-      return result;
-    }
-    char *pdata = frame->data() + (i % cluster_record_per_page_) * dim_ * sizeof(float);
-
-    float dis = dis_calc(base_vector, reinterpret_cast<const float *>(pdata), dim_);
-    if (q.size() < probes_) {
-      q.emplace(dis, i);
-    } else {
-      if (dis < q.top().dis) {
-        q.pop();
+    if (i < cluster_cache_.size()) [[likely]] {
+      float dis = dis_calc(base_vector, cluster_cache_[i], dim_);
+      if (q.size() < probes_) {
         q.emplace(dis, i);
+      } else {
+        if (dis < q.top().dis) {
+          q.pop();
+          q.emplace(dis, i);
+        }
       }
+    } else {
+      Frame *frame = nullptr;
+      RC     rc    = disk_buffer_pool_->get_this_page(FIRST_INDEX_PAGE + i / cluster_record_per_page_, &frame);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("Failed to get page while inserting record. ret:%d", rc);
+        return result;
+      }
+      char *pdata = frame->data() + (i % cluster_record_per_page_) * dim_ * sizeof(float);
+      float dis   = dis_calc(base_vector, reinterpret_cast<const float *>(pdata), dim_);
+      if (q.size() < probes_) {
+        q.emplace(dis, i);
+      } else {
+        if (dis < q.top().dis) {
+          q.pop();
+          q.emplace(dis, i);
+        }
+      }
+      frame->unpin();
     }
-    frame->unpin();
   }
 
   struct RIDNode
@@ -1274,7 +1290,7 @@ std::vector<Record> IvfFileHandler::ann_search_cached(const float *base_vector, 
   {
     Record rid;
     float  dis;
-    RecordNode(Record&& rid, float dis) : rid(std::move(rid)), dis(dis) {}
+    RecordNode(Record &&rid, float dis) : rid(std::move(rid)), dis(dis) {}
     bool operator<(const RecordNode &node) const { return dis < node.dis; }
   };
 
@@ -1309,8 +1325,8 @@ std::vector<Record> IvfFileHandler::ann_search_cached(const float *base_vector, 
       for (int i = 0; i < bucket->size; i++) {
         offset = record_size_ * i;
 
-        char       *data = bucket->data + offset;
-        float       dis  = dis_calc(base_vector, reinterpret_cast<const float *>(data), dim_);
+        char  *data = bucket->data + offset;
+        float  dis  = dis_calc(base_vector, reinterpret_cast<const float *>(data), dim_);
         Record record;
         record.copy_data(data, record_size_);
         record.set_rid(*reinterpret_cast<RID *>(data + record_size_ - sizeof(RID)));
