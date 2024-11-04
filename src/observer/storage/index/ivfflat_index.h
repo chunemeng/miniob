@@ -29,10 +29,10 @@ struct ClusterPage
  */
 struct IvfBucketPage
 {
-  static constexpr int BUCKET_SIZE = (BP_PAGE_DATA_SIZE - sizeof(int)) / sizeof(RID);
-
-  int size;
-  RID data[0];
+  static constexpr int BUCKET_SIZE = (BP_PAGE_DATA_SIZE - sizeof(int) - sizeof(PageNum)) / sizeof(RID);
+  PageNum              next_page_num;
+  int                  size;
+  RID                  data[0];
 };
 
 // this store the current end page of the bucket page

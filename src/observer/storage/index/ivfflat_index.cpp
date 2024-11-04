@@ -242,7 +242,7 @@ RC IvfflatIndexHandler::train(int lists, int probes, DistanceType distance_type)
 
   dis_calc_.init(distance_type);
 
-  int             times = 6;
+  int             times = 2;
   DataFileScanner scanner;
   int             init = 0;
   LOG_INFO("Start to train index.");
@@ -287,6 +287,7 @@ RC IvfflatIndexHandler::train(int lists, int probes, DistanceType distance_type)
     num.assign(lists, 0);
 
     scanner.close_scan();
+    LOG_INFO("train index times=%d", ii);
   }
 
   LOG_INFO("Start to insert record into cluster.");
@@ -888,6 +889,7 @@ RC IvfFileHandler::insert_cluster_record(std::vector<std::vector<float>> &data)
 
       IvfBucketPage *bucket = reinterpret_cast<IvfBucketPage *>(tmp_frame->data());
       bucket->size          = 0;
+      bucket->next_page_num = BP_INVALID_PAGE_NUM;
 
       tmp_frame->mark_dirty();
       tmp_frame->unpin();
@@ -921,7 +923,7 @@ RC IvfFileHandler::insert_record_into_bucket(const RID *rid, int offset)
 
   IvfBucketPage *bucket = reinterpret_cast<IvfBucketPage *>(frame->data());
   if (bucket->size >= IvfBucketPage::BUCKET_SIZE) {
-    frame->unpin();
+    Frame *old_frame    = frame;
     Frame *offset_frame = nullptr;
     rc = disk_buffer_pool_->get_this_page(offset_page_num_ + (offset / offset_per_page) * 2, &offset_frame);
     if (rc != RC::SUCCESS) {
@@ -937,10 +939,16 @@ RC IvfFileHandler::insert_record_into_bucket(const RID *rid, int offset)
 
     OffsetPage *offset_p                      = reinterpret_cast<OffsetPage *>(offset_frame->data());
     offset_p->array[offset % offset_per_page] = frame->page_num();
+    IvfBucketPage *old_bucket                 = reinterpret_cast<IvfBucketPage *>(old_frame->data());
+    old_bucket->next_page_num                 = frame->page_num();
+    old_frame->mark_dirty();
+    old_frame->unpin();
+
     offset_frame->mark_dirty();
     offset_frame->unpin();
-    bucket       = reinterpret_cast<IvfBucketPage *>(frame->data());
-    bucket->size = 0;
+    bucket                = reinterpret_cast<IvfBucketPage *>(frame->data());
+    bucket->next_page_num = BP_INVALID_PAGE_NUM;
+    bucket->size          = 0;
   }
 
   bucket->data[bucket->size] = *rid;
@@ -1035,40 +1043,45 @@ std::vector<RID> IvfFileHandler::ann_search(const vector<float> &base_vector, Di
   while (!q.empty()) {
     Record record;
     Frame *frame = nullptr;
-    RC     rc    = disk_buffer_pool_->get_this_page(offset_page_num_ + q.top().offset / offset_per_page * 2, &frame);
+    RC     rc = disk_buffer_pool_->get_this_page(offset_page_num_ + q.top().offset / offset_per_page * 2 + 1, &frame);
     if (rc != RC::SUCCESS) {
       LOG_WARN("Failed to get page while inserting record. ret:%d", rc);
       return result;
     }
-    OffsetPage *offset_page = reinterpret_cast<OffsetPage *>(frame->data());
-    PageNum     page        = offset_page->array[q.top().offset % offset_per_page];
-    frame->unpin();
-    rc = disk_buffer_pool_->get_this_page(page, &frame);
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("Failed to get page while inserting record. ret:%d", rc);
-      return result;
-    }
-    IvfBucketPage *bucket = reinterpret_cast<IvfBucketPage *>(frame->data());
-    for (int i = 0; i < bucket->size; i++) {
-      rc = data_file_handler_->get_record(bucket->data[i], record);
-      if (rc != RC::SUCCESS) {
-        LOG_WARN("Failed to get record while inserting record. ret:%d", rc);
-        return result;
-      }
-      offset = record.len() - sizeof(RID) - dim_ * sizeof(float);
 
-      float dis = dis_calc(base_vector.data(), reinterpret_cast<const float *>(record.data() + offset), dim_);
-      RID  *rid = reinterpret_cast<RID *>(record.data() + record.len() - sizeof(RID));
-      if (result_q.size() < limit) {
-        result_q.emplace(*rid, dis);
-      } else {
-        if (dis < result_q.top().dis) {
-          result_q.pop();
+    IvfBucketPage *bucket        = reinterpret_cast<IvfBucketPage *>(frame->data());
+    PageNum        next_page_num = BP_INVALID_PAGE_NUM;
+    do {
+      if (next_page_num != BP_INVALID_PAGE_NUM) {
+        rc = disk_buffer_pool_->get_this_page(bucket->next_page_num, &frame);
+        if (rc != RC::SUCCESS) {
+          LOG_WARN("Failed to get page while inserting record. ret:%d", rc);
+          return result;
+        }
+        bucket = reinterpret_cast<IvfBucketPage *>(frame->data());
+      }
+      for (int i = 0; i < bucket->size; i++) {
+        rc = data_file_handler_->get_record(bucket->data[i], record);
+        if (rc != RC::SUCCESS) {
+          LOG_WARN("Failed to get record while inserting record. ret:%d", rc);
+          return result;
+        }
+        offset = record.len() - sizeof(RID) - dim_ * sizeof(float);
+
+        float dis = dis_calc(base_vector.data(), reinterpret_cast<const float *>(record.data() + offset), dim_);
+        RID  *rid = reinterpret_cast<RID *>(record.data() + record.len() - sizeof(RID));
+        if (result_q.size() < limit) {
           result_q.emplace(*rid, dis);
+        } else {
+          if (dis < result_q.top().dis) {
+            result_q.pop();
+            result_q.emplace(*rid, dis);
+          }
         }
       }
-    }
-    frame->unpin();
+      next_page_num = bucket->next_page_num;
+      frame->unpin();
+    } while (bucket->next_page_num != BP_INVALID_PAGE_NUM);
     q.pop();
   }
 

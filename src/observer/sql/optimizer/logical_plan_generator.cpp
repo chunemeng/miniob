@@ -221,14 +221,6 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
   return rc;
 }
 
-int LogicalPlanGenerator::implicit_cast_cost(AttrType from, AttrType to)
-{
-  if (from == to) {
-    return 0;
-  }
-  return DataType::type_instance(from)->cast_cost(to);
-}
-
 RC LogicalPlanGenerator::create_plan(InsertStmt *insert_stmt, unique_ptr<LogicalOperator> &logical_operator)
 {
   Table *table = insert_stmt->table();
