@@ -906,7 +906,8 @@ RC IvfFileHandler::insert_record_into_bucket(const RID *rid, int offset)
   int    offset_per_page = BP_PAGE_DATA_SIZE / sizeof(int);
 
   // NOTE: offset_page_num_ 是第一个offset page的page number, *2 是因为分配时与数据页是交替分配的
-  RC rc = disk_buffer_pool_->get_this_page(offset_page_num_ + (offset / offset_per_page) * 2, &frame);
+  RC rc =
+      disk_buffer_pool_->get_this_page(offset_page_num_ + (offset / offset_per_page) * (1 + offset_per_page), &frame);
   if (rc != RC::SUCCESS) {
     LOG_WARN("Failed to get page while inserting record. ret:%d", rc);
     return rc;
@@ -925,7 +926,8 @@ RC IvfFileHandler::insert_record_into_bucket(const RID *rid, int offset)
   if (bucket->size >= IvfBucketPage::BUCKET_SIZE) {
     Frame *old_frame    = frame;
     Frame *offset_frame = nullptr;
-    rc = disk_buffer_pool_->get_this_page(offset_page_num_ + (offset / offset_per_page) * 2, &offset_frame);
+    rc                  = disk_buffer_pool_->get_this_page(
+        offset_page_num_ + (offset / offset_per_page) * (1 + offset_per_page), &offset_frame);
     if (rc != RC::SUCCESS) {
       LOG_WARN("Failed to get page while inserting record. ret:%d", rc);
       return rc;
@@ -1043,7 +1045,8 @@ std::vector<RID> IvfFileHandler::ann_search(const vector<float> &base_vector, Di
   while (!q.empty()) {
     Record record;
     Frame *frame = nullptr;
-    RC     rc = disk_buffer_pool_->get_this_page(offset_page_num_ + q.top().offset / offset_per_page * 2 + 1, &frame);
+    RC     rc    = disk_buffer_pool_->get_this_page(
+        offset_page_num_ + q.top().offset / offset_per_page * (1 + offset_per_page) + 1 + q.top().offset, &frame);
     if (rc != RC::SUCCESS) {
       LOG_WARN("Failed to get page while inserting record. ret:%d", rc);
       return result;
@@ -1084,12 +1087,9 @@ std::vector<RID> IvfFileHandler::ann_search(const vector<float> &base_vector, Di
     } while (bucket->next_page_num != BP_INVALID_PAGE_NUM);
     q.pop();
   }
-
-  for (int i = 0; i < limit; i++) {
-    if (result_q.empty()) {
-      break;
-    }
-    result.push_back(result_q.top().rid);
+  result.resize(limit);
+  while (!result_q.empty()) {
+    result[result_q.size() - 1] = result_q.top().rid;
     result_q.pop();
   }
   return result;
