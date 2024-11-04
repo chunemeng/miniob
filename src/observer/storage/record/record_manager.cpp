@@ -299,7 +299,6 @@ RC RowRecordPageHandler::insert_record(const char *data, RID *rid)
     rid->slot_num = index;
   }
 
-  // LOG_TRACE("Insert record. rid page_num=%d, slot num=%d", get_page_num(), index);
   return RC::SUCCESS;
 }
 

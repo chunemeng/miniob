@@ -167,12 +167,9 @@ RC PhysicalPlanGenerator::create_plan(TableGetLogicalOperator &table_get_oper, u
       field_expr = static_cast<FieldExpr *>(right_expr.get());
       value_expr = static_cast<ValueExpr *>(left_expr.get());
     }
-    const Field &field = field_expr->field();
-    index              = table->find_index_by_field(field.field_name().c_str());
-    if (nullptr == index) {
-      LOG_INFO("no index found for field %s", field.field_name().c_str());
-      return RC::INVALID_ARGUMENT;
-    }
+
+    index              = table->find_index(field_expr->field_name());
+
     const Value                  &value           = value_expr->get_value();
     IndexVecScanPhysicalOperator *index_scan_oper = new IndexVecScanPhysicalOperator(table,
         index,
@@ -183,7 +180,6 @@ RC PhysicalPlanGenerator::create_plan(TableGetLogicalOperator &table_get_oper, u
 
     index_scan_oper->set_predicates(std::move(predicates));
     oper = unique_ptr<PhysicalOperator>(index_scan_oper);
-    LOG_TRACE("use vec index scan");
     return RC::SUCCESS;
   }
 

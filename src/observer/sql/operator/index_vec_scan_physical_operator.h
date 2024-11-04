@@ -57,11 +57,14 @@ private:
   DistanceType type_;
   Value        value_;
 
+  int n = 0;
+
   Record   current_record_;
   RowTuple tuple_;
 
-  std::vector<RID> rids_;
-  int              n = 0;
+  std::vector<RID>    rids_;
+  std::vector<Record> records_;
+  bool                is_cached_ = false;
 
   std::vector<std::unique_ptr<Expression>> predicates_;
 };

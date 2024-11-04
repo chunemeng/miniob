@@ -230,10 +230,10 @@ struct IvfFileHandler
    */
   RC insert_record_into_bucket(const Record &record, int offset);
 
-  std::vector<RID>    ann_search(const vector<float> &base_vector, DistanceType type, size_t limit);
+  std::vector<RID> ann_search(const vector<float> &base_vector, DistanceType type, size_t limit);
+  std::vector<RID> ann_search_p(const float *base_vector, DistanceType type, size_t limit);
 
-  std::vector<Record> ann_search(DistanceType type, size_t limit, const vector<float> &base_vector);
-
+  std::vector<Record> ann_search_cached(const float *base_vector, DistanceType type, size_t limit);
   /**
    * @brief 初始化
    *
@@ -282,10 +282,11 @@ struct IvfIndexFileHeader : public IndexFileHeader
 {
   IvfIndexFileHeader() { root_page = BP_INVALID_PAGE_NUM; }
 
-  int lists_         = 1;
-  int probes_        = 1;
-  int dim_           = 1;
-  int distance_type_ = 0;  ///< distance type
+  int  lists_         = 1;
+  int  probes_        = 1;
+  int  dim_           = 1;
+  int  distance_type_ = 0;  ///< distance type
+  bool whole_cached_  = false;
 };
 
 #define FIRST_INDEX_PAGE 1
@@ -313,10 +314,16 @@ public:
   RC create(LogHandler &log_handler, bool is_unqiue, DiskBufferPool &bpm, DiskBufferPool &ivf,
       std::vector<const FieldMeta *> &field_metas, int null_field_num);
 
+  std::vector<RID> ann_search_p(const float *base_vector, DistanceType type, size_t limit);
+
   std::vector<RID> ann_search(const vector<float> &base_vector, DistanceType type, size_t limit);
+
+  std::vector<Record> ann_search_cached(const float *base_vector, DistanceType type, size_t limit);
 
   RC open(LogHandler &log_handler, BufferPoolManager &bpm, const char *file_name);
   RC open(LogHandler &log_handler, DiskBufferPool &buffer_pool, DiskBufferPool &ivf);
+
+  void set_cached() { whole_cached_ = true; }
 
   /**
    * 关闭句柄indexHandle对应的索引文件
@@ -334,9 +341,9 @@ public:
   RC sync();
 
 public:
-  const IndexFileHeader &file_header() const { return file_header_; }
-  DiskBufferPool        &buffer_pool() const { return *disk_buffer_pool_; }
-  LogHandler            &log_handler() const { return *log_handler_; }
+  const IvfIndexFileHeader &file_header() const { return file_header_; }
+  DiskBufferPool           &buffer_pool() const { return *disk_buffer_pool_; }
+  LogHandler               &log_handler() const { return *log_handler_; }
 
 public:
   RC train(int lists, int probes, DistanceType distance_type);
@@ -352,6 +359,7 @@ private:
   IvfIndexFileHeader file_header_;
   DataFileHandler    data_file_handler_;
   IvfFileHandler     ivf_file_handler_;
+  bool               whole_cached_ = false;
 
   DistanceCalc                    dis_calc_;
   unique_ptr<common::MemPoolItem> mem_pool_item_;
@@ -380,7 +388,9 @@ public:
 
   RC drop() override;
 
-  vector<RID> ann_search(const vector<float> &base_vector, DistanceType type, size_t limit);
+  vector<RID>    ann_search(const vector<float> &base_vector, DistanceType type, size_t limit);
+  vector<RID>    ann_search_p(const float *base_vector, DistanceType type, size_t limit);
+  vector<Record> ann_search_cached(const float *base_vector, DistanceType type, size_t limit);
 
   RC close();
 
@@ -391,6 +401,8 @@ public:
   RC delete_entry(const char *record, const RID *rid) override { return RC::UNIMPLEMENTED; };
 
   RC sync() override { return index_handler_.sync(); };
+
+  bool is_cached() const { return index_handler_.file_header().whole_cached_; }
 
 private:
   bool                inited_ = false;

@@ -147,8 +147,11 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
       field_expr = static_cast<FieldExpr *>(right_expr.get());
       left_expr.swap(right_expr);
     }
-    const Field &field = field_expr->field();
-    Index       *index = tables[0]->find_index_by_field(field.field_name().c_str());
+    if (field_expr == nullptr) {
+      return RC::INVALID_ARGUMENT;
+    }
+
+    Index *index = tables[0]->find_index(field_expr->field_name());
 
     is_vector_scanner = index != nullptr && index->index_meta().type() == IndexType::IVF;
   }

@@ -18,10 +18,8 @@ RC IndexVecScanPhysicalOperator::open(Trx *trx)
   std::vector<float> value;
   Value              v;
   Value::cast_to(value_, AttrType::VECTORS, v);
-  value.resize(v.length());
-  memcpy(value.data(), v.data(), v.length() * sizeof(float));
 
-  rids_ = index->ann_search(value, type_, limit_);
+  rids_ = index->ann_search_p(reinterpret_cast<const float *>(v.data()), type_, limit_);
 
   record_handler_ = table_->record_handler();
   if (nullptr == record_handler_) {
@@ -42,33 +40,19 @@ RC IndexVecScanPhysicalOperator::next()
     return RC::RECORD_EOF;
   }
 
-  bool filter_result = false;
-  rc                 = record_handler_->get_record(rids_[n], current_record_);
+  rc = record_handler_->get_record(rids_[n], current_record_);
   if (OB_FAIL(rc)) {
     LOG_TRACE("failed to get record. rid=%s, rc=%s", rids_[n].to_string().c_str(), strrc(rc));
     return rc;
   }
 
   tuple_.set_record(&current_record_);
-  rc = filter(tuple_, filter_result);
-  if (OB_FAIL(rc)) {
-    LOG_TRACE("failed to filter record. rc=%s", strrc(rc));
-    return rc;
-  }
 
-  if (!filter_result) {
-    LOG_TRACE("record filtered");
-  }
   n++;
-  rc = trx_->visit_record(table_, current_record_, mode_);
-
   return rc;
 }
 
-RC IndexVecScanPhysicalOperator::close()
-{
-  return RC::SUCCESS;
-}
+RC IndexVecScanPhysicalOperator::close() { return RC::SUCCESS; }
 
 Tuple *IndexVecScanPhysicalOperator::current_tuple()
 {

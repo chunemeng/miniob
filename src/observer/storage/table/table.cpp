@@ -1181,3 +1181,15 @@ RC Table::create_vector_index(Trx *trx, int lists, int probs, DistanceType type,
   LOG_INFO("Successfully added a new index (%s) on the table (%s)", index_name, name().c_str());
   return rc;
 }
+
+Index *Table::find_index(const string &index_name) const {
+  for (Index *index : indexes_) {
+    auto meta = index->index_meta();
+    if (meta.field().size() == 2) {
+      if (meta.field()[1] ==  index_name) {
+        return index;
+      }
+    }
+  }
+  return nullptr;
+}

@@ -14,6 +14,8 @@ cmake-build-*/*
 build
 .cache/*
 .DS_Store
+FlameGraph/*
+ann-benchmarks/*
 .idea
 .ccls-cache
 compile_commands.json
