@@ -228,9 +228,11 @@ struct IvfFileHandler
    * @param record_size 记录大小
    * @param rid         返回该记录的标识符
    */
-  RC insert_record_into_bucket(const Record& record, int offset);
+  RC insert_record_into_bucket(const Record &record, int offset);
 
-  std::vector<RID> ann_search(const vector<float> &base_vector, DistanceType type, size_t limit);
+  std::vector<RID>    ann_search(const vector<float> &base_vector, DistanceType type, size_t limit);
+
+  std::vector<Record> ann_search(DistanceType type, size_t limit, const vector<float> &base_vector);
 
   /**
    * @brief 初始化
@@ -260,6 +262,7 @@ struct IvfFileHandler
   int              data_offset_             = 0;
   int              record_size_             = 0;
   int              bucket_size_             = 0;
+  bool             is_cached_all_           = false;
   DistanceCalc     dis_calc_;
   StorageFormat    storage_format_;
   LogHandler      *log_handler_       = nullptr;  /// 日志处理器
@@ -320,8 +323,6 @@ public:
    */
   RC close();
 
-  RC drop();
-
   /**
    * @brief 此函数向IndexHandle对应的索引中插入一个索引项。
    * @details 参数user_key指向要插入的属性值，参数rid标识该索引项对应的元组，
@@ -329,13 +330,6 @@ public:
    * @note 这里假设user_key的内存大小与attr_length 一致
    */
   RC insert_entry(const char *user_key, const RID *rid);
-
-  /**
-   * @brief 获取指定值的record
-   * @param key_len user_key的长度
-   * @param rid  返回值，记录记录所在的页面号和slot
-   */
-  RC get_entry(const char *user_key, int key_len, list<RID> &rids);
 
   RC sync();
 
