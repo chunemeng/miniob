@@ -1017,7 +1017,7 @@ std::vector<RID> IvfFileHandler::ann_search(const vector<float> &base_vector, Di
 
   DistanceCalc dis_calc;
   dis_calc.init(type);
-
+  std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
   for (int i = 0; i < list_; i++) {
     Frame *frame = nullptr;
     RC     rc    = disk_buffer_pool_->get_this_page(FIRST_INDEX_PAGE + i / cluster_record_per_page_, &frame);
@@ -1038,6 +1038,8 @@ std::vector<RID> IvfFileHandler::ann_search(const vector<float> &base_vector, Di
     }
     frame->unpin();
   }
+  std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+  LOG_INFO("time:%d", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count());
 
   struct RIDNode
   {
@@ -1052,8 +1054,7 @@ std::vector<RID> IvfFileHandler::ann_search(const vector<float> &base_vector, Di
 
   int offset = 0;
 
-  int read_time = 0;
-
+  start = std::chrono::steady_clock::now();
   while (!q.empty()) {
     Frame *frame = nullptr;
     RC     rc    = disk_buffer_pool_->get_this_page(
@@ -1066,9 +1067,11 @@ std::vector<RID> IvfFileHandler::ann_search(const vector<float> &base_vector, Di
 
     IvfBucketPage *bucket        = reinterpret_cast<IvfBucketPage *>(frame->data());
     PageNum        next_page_num = BP_INVALID_PAGE_NUM;
+    int            read_time     = 0;
+    int   high_bound = rand() % 55 + 10;
     do {
       if (next_page_num != BP_INVALID_PAGE_NUM) {
-        if (read_time > 25) {
+        if (read_time > high_bound) {
           break;
         }
         rc = disk_buffer_pool_->get_this_page(bucket->next_page_num, &frame);
@@ -1102,6 +1105,9 @@ std::vector<RID> IvfFileHandler::ann_search(const vector<float> &base_vector, Di
 
     q.pop();
   }
+  end = std::chrono::steady_clock::now();
+  LOG_INFO("time:%d", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count());
+
   result.resize(limit);
   while (!result_q.empty()) {
     result[result_q.size() - 1] = result_q.top().rid;
