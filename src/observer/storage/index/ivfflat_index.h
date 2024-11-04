@@ -2,6 +2,7 @@
 
 #include "storage/index/index.h"
 #include "bplus_tree.h"
+#include <immintrin.h>
 
 // WARNING: 以下代码不支持删除和任何事务以及并发操作
 enum DistanceType
@@ -10,13 +11,6 @@ enum DistanceType
   L2      = 1,
   IP      = 2,
   COSINE  = 3,
-};
-
-// NOTE: 簇点的页，用于存储簇点和簇点指向的pageid
-struct ClusterPage
-{
-  PageNum next_page_num;
-  char    data[0];
 };
 
 // NOTE: 存储向量的倒排索引offset page id，到datapage中查找向量
@@ -68,11 +62,34 @@ public:
 
   static float l2_distance(const float *a, const float *b, int size)
   {
-    float sum = 0;
-    for (int i = 0; i < size; i++) {
-      sum += (a[i] - b[i]) * (a[i] - b[i]);
+    __m256 sum_vec = _mm256_setzero_ps();
+    int    i;
+
+    // 处理 8 个 float 数据
+    for (i = 0; i <= size - 8; i += 8) {
+      __m256 a_vec    = _mm256_loadu_ps(&a[i]);
+      __m256 b_vec    = _mm256_loadu_ps(&b[i]);
+      __m256 diff_vec = _mm256_sub_ps(a_vec, b_vec);
+      sum_vec         = _mm256_add_ps(sum_vec, _mm256_mul_ps(diff_vec, diff_vec));
     }
-    return sum;
+
+    // 将 SIMD 结果归约
+    float sum[8];
+    _mm256_storeu_ps(sum, sum_vec);
+
+    // 计算总和
+    float total_sum = 0.0f;
+    for (int j = 0; j < 8; j++) {
+      total_sum += sum[j];
+    }
+
+    // 处理剩余的元素
+    for (; i < size; i++) {
+      float diff = a[i] - b[i];
+      total_sum += diff * diff;
+    }
+
+    return total_sum;
   }
 
   static float ip_distance(const float *a, const float *b, int size)

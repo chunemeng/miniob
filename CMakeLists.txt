@@ -21,7 +21,7 @@ OPTION(ENABLE_COVERAGE "Enable unittest coverage" OFF)
 OPTION(ENABLE_NOPIE "Enable no pie" OFF)
 OPTION(CONCURRENCY "Support concurrency operations" OFF)
 OPTION(STATIC_STDLIB "Link std library static or dynamic, such as libgcc, libstdc++, libasan" OFF)
-OPTION(USE_SIMD "Use SIMD" OFF)
+OPTION(USE_SIMD "Use SIMD" ON)
 OPTION(USE_MUSL_LIBC "Use musl libc" OFF)
 
 MESSAGE(STATUS "HOME dir: $ENV{HOME}")
@@ -53,8 +53,11 @@ ENDIF (ENABLE_NOPIE)
 
 # Requires support for avx2
 IF(USE_SIMD)
+    MESSAGE(STATUS "USE_SIMD is ON")
     SET(CMAKE_COMMON_FLAGS "${CMAKE_COMMON_FLAGS} -mavx2")
     ADD_DEFINITIONS(-DUSE_SIMD)
+ELSE()
+    MESSAGE(STATUS "USE_SIMD is OFF")
 ENDIF(USE_SIMD)
 
 IF(DEBUG)
