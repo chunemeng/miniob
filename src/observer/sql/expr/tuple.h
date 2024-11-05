@@ -334,7 +334,6 @@ public:
 
   RC find_cell_index(const TupleCellSpec &spec, int &index) const override
   {
-    // FIXME: IS THIS RIGHT?
     return tuple_->find_cell_index(spec, index);
   }
 

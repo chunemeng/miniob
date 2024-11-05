@@ -312,9 +312,6 @@ RC IvfflatIndexHandler::train(int lists, int probes, DistanceType distance_type)
 
   LOG_INFO("Start to insert record into cluster.");
 
-  lists += lists & 1;
-  lists /= 2;
-
   IvfIndexFileHeader *file_header = reinterpret_cast<IvfIndexFileHeader *>(frame->data());
   file_header->lists_             = lists;
   file_header->probes_            = probes;
@@ -1030,7 +1027,7 @@ RC IvfFileHandler::init(DiskBufferPool &buffer_pool, LogHandler &log_handler)
 RC IvfFileHandler::init_vec_info(int dim, int lists, int probes, DistanceType distance_type, DataFileHandler &handler)
 {
   dim_                     = dim;
-  list_                    = lists * 2;
+  list_                    = lists;
   probes_                  = probes;
   data_file_handler_       = &handler;
   int record_size          = dim_ * sizeof(float);
@@ -1228,7 +1225,6 @@ std::vector<RID> IvfFileHandler::ann_search_p(const float *base_vector, Distance
     IvfBucketPage *bucket        = reinterpret_cast<IvfBucketPage *>(frame->data());
     PageNum        next_page_num = BP_INVALID_PAGE_NUM;
     do {
-      LOG_INFO("next_page_num:%d %d %d",next_page_num,frame->page_num(), bucket->next_page_num);
       if (next_page_num != BP_INVALID_PAGE_NUM) {
         rc = disk_buffer_pool_->get_this_page(next_page_num, &frame);
         if (rc != RC::SUCCESS) {
