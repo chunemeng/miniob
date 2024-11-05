@@ -508,6 +508,7 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
                   real_value->data() + j * BP_PAGE_DATA_SIZE,
                   min(len - j * BP_PAGE_DATA_SIZE, BP_PAGE_DATA_SIZE));
               frame->mark_dirty();
+              frame->unpin();
             }
           } break;
           case AttrType::TEXTS: {
@@ -544,6 +545,7 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
               Page &page = frame->page();
               memcpy(page.data, v_data + j * BP_PAGE_DATA_SIZE, min(len - j * BP_PAGE_DATA_SIZE, BP_PAGE_DATA_SIZE));
               frame->mark_dirty();
+              frame->unpin();
             }
             for (int j = pages; j < max_pages; j++) {
               bp[j] = BP_INVALID_PAGE_NUM;
@@ -981,6 +983,7 @@ RC Table::make_record(
                   real_value->data() + j * BP_PAGE_DATA_SIZE,
                   min(len - j * BP_PAGE_DATA_SIZE, BP_PAGE_DATA_SIZE));
               frame->mark_dirty();
+              frame->unpin();
             }
           } break;
           case AttrType::TEXTS: {
@@ -1017,6 +1020,7 @@ RC Table::make_record(
               Page &page = frame->page();
               memcpy(page.data, v_data + j * BP_PAGE_DATA_SIZE, min(len - j * BP_PAGE_DATA_SIZE, BP_PAGE_DATA_SIZE));
               frame->mark_dirty();
+              frame->unpin();
             }
             for (int j = pages; j < max_pages - 1; j++) {
               if (bp[j] != BP_INVALID_PAGE_NUM) {

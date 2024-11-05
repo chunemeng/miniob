@@ -150,12 +150,6 @@ RC BPFrameManager::free(int buffer_pool_id, PageNum page_num, Frame *frame)
 
 RC BPFrameManager::free_internal(const FrameId &frame_id, Frame *frame)
 {
-  Frame                *frame_source = nullptr;
-  [[maybe_unused]] bool found        = frames_.get(frame_id, frame_source);
-  ASSERT(found && frame == frame_source && frame->pin_count() == 1,
-      "failed to free frame. found=%d, frameId=%s, frame_source=%p, frame=%p, pinCount=%d, lbt=%s",
-      found, frame_id.to_string().c_str(), frame_source, frame, frame->pin_count(), lbt());
-
   frame->set_page_num(-1);
   frame->unpin();
   frames_.remove(frame_id);
@@ -715,7 +709,7 @@ RC DiskBufferPool::allocate_frame(PageNum page_num, Frame **buffer)
     }
 
     LOG_TRACE("frames are all allocated, so we should purge some frames to get one free frame");
-    (void)frame_manager_.purge_frames(1 /*count*/, purger);
+    (void)frame_manager_.purge_frames(3 /*count*/, purger);
 
     if (++count > 25) {
       LOG_ERROR("Failed to allocate frame %s:%d, due to failed to purge frames.", file_name_.c_str(), page_num);
@@ -746,8 +740,9 @@ RC DiskBufferPool::load_page(PageNum page_num, Frame *frame)
     return rc;
   }
 
-  scoped_lock lock_guard(wr_lock_);
   int64_t     offset = ((int64_t)page_num) * BP_PAGE_SIZE;
+
+  scoped_lock lock_guard(wr_lock_);
   if (lseek(file_desc_, offset, SEEK_SET) == -1) {
     LOG_ERROR("Failed to load page %s:%d, due to failed to lseek:%s.", file_name_.c_str(), page_num, strerror(errno));
 

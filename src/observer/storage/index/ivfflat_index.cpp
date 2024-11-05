@@ -242,23 +242,7 @@ RC IvfflatIndexHandler::train(int lists, int probes, DistanceType distance_type)
 
   disk_buffer_pool_->get_this_page(FIRST_INDEX_PAGE, &frame);
 
-  IvfIndexFileHeader *file_header = reinterpret_cast<IvfIndexFileHeader *>(frame->data());
-  file_header->lists_             = lists;
-  file_header->probes_            = probes;
-  file_header->distance_type_     = distance_type;
-  file_header->dim_               = dim;
-  file_header_.lists_             = lists;
-  file_header_.probes_            = probes;
-  file_header_.distance_type_     = distance_type;
-  file_header_.dim_               = dim;
-  header_dirty_                   = true;
-  frame->mark_dirty();
-
-
-  ivf_file_handler_.init_vec_info(dim, lists, probes, distance_type, data_file_handler_);
-
   lists *= 2;
-
 
   std::vector<std::vector<float>> last(lists, std::vector<float>(dim, 0));
   std::vector<std::vector<float>> cur(lists, std::vector<float>(dim, 0));
@@ -270,6 +254,7 @@ RC IvfflatIndexHandler::train(int lists, int probes, DistanceType distance_type)
   DataFileScanner scanner;
   int             init = 0;
   LOG_INFO("Start to train index.");
+  int num_rel = 0;
   for (int ii = 0; ii < times; ii++) {
     RC rc = scanner.open_scan(*disk_buffer_pool_, *log_handler_, ReadWriteMode::READ_ONLY);
 
@@ -279,6 +264,7 @@ RC IvfflatIndexHandler::train(int lists, int probes, DistanceType distance_type)
     }
 
     Record record;
+    num_rel = 0;
     while (OB_SUCC(rc = scanner.next(record))) {
       auto data = reinterpret_cast<float *>(record.data() + offset);
       if (init < lists) {
@@ -306,8 +292,18 @@ RC IvfflatIndexHandler::train(int lists, int probes, DistanceType distance_type)
 
         num[off]++;
       }
+      num_rel++;
     }
-    last.swap(cur);
+    if (num_rel < lists) [[unlikely]] {
+      lists = num_rel;
+      init  = 0;
+      last.resize(lists);
+      cur.resize(lists);
+      num.resize(lists);
+    } else {
+      last.swap(cur);
+    }
+
     num.assign(lists, 0);
 
     scanner.close_scan();
@@ -315,6 +311,23 @@ RC IvfflatIndexHandler::train(int lists, int probes, DistanceType distance_type)
   }
 
   LOG_INFO("Start to insert record into cluster.");
+
+  lists += lists & 1;
+  lists /= 2;
+
+  IvfIndexFileHeader *file_header = reinterpret_cast<IvfIndexFileHeader *>(frame->data());
+  file_header->lists_             = lists;
+  file_header->probes_            = probes;
+  file_header->distance_type_     = distance_type;
+  file_header->dim_               = dim;
+  file_header_.lists_             = lists;
+  file_header_.probes_            = probes;
+  file_header_.distance_type_     = distance_type;
+  file_header_.dim_               = dim;
+  header_dirty_                   = true;
+  frame->mark_dirty();
+
+  ivf_file_handler_.init_vec_info(dim, lists, probes, distance_type, data_file_handler_);
 
   RC rc = ivf_file_handler_.insert_cluster_record(last);
 
@@ -963,6 +976,7 @@ RC IvfFileHandler::insert_record_into_bucket(const Record &record, int offset)
   IvfBucketPage *bucket = reinterpret_cast<IvfBucketPage *>(frame->data());
   if (bucket->size >= bucket_size_) {
     Frame *old_frame    = frame;
+    frame               = nullptr;
     Frame *offset_frame = nullptr;
     rc                  = disk_buffer_pool_->get_this_page(
         offset_page_num_ + (offset / offset_per_page) * (1 + offset_per_page), &offset_frame);
@@ -1098,10 +1112,9 @@ std::vector<RID> IvfFileHandler::ann_search(const vector<float> &base_vector, Di
 
     IvfBucketPage *bucket        = reinterpret_cast<IvfBucketPage *>(frame->data());
     PageNum        next_page_num = BP_INVALID_PAGE_NUM;
-
     do {
       if (next_page_num != BP_INVALID_PAGE_NUM) {
-        rc = disk_buffer_pool_->get_this_page(bucket->next_page_num, &frame);
+        rc = disk_buffer_pool_->get_this_page(next_page_num, &frame);
         if (rc != RC::SUCCESS) {
           LOG_WARN("Failed to get page while inserting record. ret:%d", rc);
           return result;
@@ -1167,6 +1180,7 @@ std::vector<RID> IvfFileHandler::ann_search_p(const float *base_vector, Distance
         }
       }
     } else {
+      // TODO: 这里可以优化，不用每次都去磁盘读取
       Frame *frame = nullptr;
       RC     rc    = disk_buffer_pool_->get_this_page(FIRST_INDEX_PAGE + i / cluster_record_per_page_, &frame);
       if (rc != RC::SUCCESS) {
@@ -1202,6 +1216,7 @@ std::vector<RID> IvfFileHandler::ann_search_p(const float *base_vector, Distance
 
   while (!q.empty()) {
     Frame *frame = nullptr;
+    LOG_INFO("offset:%d", q.top().offset);
     RC     rc    = disk_buffer_pool_->get_this_page(
         offset_page_num_ + q.top().offset / offset_per_page * (1 + offset_per_page) + 1 + q.top().offset, &frame);
 
@@ -1213,8 +1228,9 @@ std::vector<RID> IvfFileHandler::ann_search_p(const float *base_vector, Distance
     IvfBucketPage *bucket        = reinterpret_cast<IvfBucketPage *>(frame->data());
     PageNum        next_page_num = BP_INVALID_PAGE_NUM;
     do {
+      LOG_INFO("next_page_num:%d %d %d",next_page_num,frame->page_num(), bucket->next_page_num);
       if (next_page_num != BP_INVALID_PAGE_NUM) {
-        rc = disk_buffer_pool_->get_this_page(bucket->next_page_num, &frame);
+        rc = disk_buffer_pool_->get_this_page(next_page_num, &frame);
         if (rc != RC::SUCCESS) {
           LOG_WARN("Failed to get page while inserting record. ret:%d", rc);
           return result;
