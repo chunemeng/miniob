@@ -63,8 +63,6 @@ private:
   RowTuple tuple_;
 
   std::vector<RID>    rids_;
-  std::vector<Record> records_;
-  bool                is_cached_ = false;
 
   std::vector<std::unique_ptr<Expression>> predicates_;
 };

@@ -944,14 +944,13 @@ RC MysqlCommunicator::send_result_rows(
 {
   RC rc = RC::SUCCESS;
 
-  vector<char> packet;
-  packet.resize(4 * 1024 * 1024);  // TODO warning: length cannot be fix
-
   int affected_rows = 0;
   if (event->session()->get_execution_mode() == ExecutionMode::CHUNK_ITERATOR && event->session()->used_chunk_mode()) {
-    rc = write_chunk_result(sql_result, packet, affected_rows, need_disconnect);
-  } else {
-    rc = write_tuple_result(sql_result, packet, affected_rows, need_disconnect);
+    std::vector<char> ch(1024 * 1024 * 4, 0);
+    rc = write_chunk_result(sql_result, ch, affected_rows, need_disconnect);
+  } else [[likely]] {
+    std::string buf(64, 0);
+    rc = write_tuple_result(sql_result, buf, affected_rows, need_disconnect);
   }
 
   // 所有行发送完成后，发送一个EOF或OK包
@@ -970,6 +969,7 @@ RC MysqlCommunicator::send_result_rows(
 
   LOG_TRACE("send rows to client done");
   need_disconnect = false;
+
   return rc;
 }
 
@@ -1011,6 +1011,7 @@ RC MysqlCommunicator::write_tuple_result(
     int payload_length = pos - 4;
     store_int3(buf, payload_length);
     rc = writer_->writen(buf, pos);
+
     if (OB_FAIL(rc)) {
       LOG_WARN("failed to send row packet to client. addr=%s, error=%s", addr(), strerror(errno));
       need_disconnect = true;
@@ -1053,6 +1054,143 @@ RC MysqlCommunicator::write_chunk_result(
         need_disconnect = true;
         return rc;
       }
+    }
+  }
+  return rc;
+}
+RC MysqlCommunicator::write_tuple_result(SqlResult *sql_result, char *buf, int &affected_rows, bool &need_disconnect)
+{
+  Tuple *tuple = nullptr;
+  RC     rc    = RC::SUCCESS;
+  while (RC::SUCCESS == (rc = sql_result->next_tuple(tuple))) {
+    assert(tuple != nullptr);
+
+    affected_rows++;
+
+    const int cell_num = tuple->cell_num();
+    if (cell_num == 0) {
+      continue;
+    }
+
+    // https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query_response_text_resultset.html
+    // https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query_response_text_resultset_row.html
+    // note: if some field is null, send a 0xFB
+    int pos = 0;
+
+    pos += 3;
+    pos += store_int1(buf + pos, sequence_id_++);
+
+    Value value;
+    for (int i = 0; i < cell_num; i++) {
+      rc = tuple->cell_at(i, value);
+      if (rc != RC::SUCCESS) {
+        sql_result->set_return_code(rc);
+        break;  // TODO send error packet
+      }
+
+      pos += store_lenenc_string(buf + pos, value.to_string().c_str());
+    }
+
+    int payload_length = pos - 4;
+    store_int3(buf, payload_length);
+    rc = writer_->writen(buf, pos);
+    if (OB_FAIL(rc)) {
+      LOG_WARN("failed to send row packet to client. addr=%s, error=%s", addr(), strerror(errno));
+      need_disconnect = true;
+      return rc;
+    }
+  }
+  return rc;
+}
+RC MysqlCommunicator::write_chunk_result(SqlResult *sql_result, char *buf, int &affected_rows, bool &need_disconnect)
+{
+  Chunk chunk;
+  RC    rc = RC::SUCCESS;
+  while (RC::SUCCESS == (rc = sql_result->next_chunk(chunk))) {
+    int column_num = chunk.column_num();
+    if (column_num == 0) {
+      continue;
+    }
+    for (int i = 0; i < chunk.rows(); i++) {
+      affected_rows++;
+      // https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query_response_text_resultset.html
+      // https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query_response_text_resultset_row.html
+      // note: if some field is null, send a 0xFB
+      int pos = 0;
+
+      pos += 3;
+      pos += store_int1(buf + pos, sequence_id_++);
+
+      for (int col_idx = 0; col_idx < column_num; col_idx++) {
+        Value value = chunk.get_value(col_idx, i);
+        pos += store_lenenc_string(buf + pos, value.to_string().c_str());
+      }
+
+      int payload_length = pos - 4;
+      store_int3(buf, payload_length);
+      rc = writer_->writen(buf, pos);
+      if (OB_FAIL(rc)) {
+        LOG_WARN("failed to send row packet to client. addr=%s, error=%s", addr(), strerror(errno));
+        need_disconnect = true;
+        return rc;
+      }
+    }
+  }
+  return rc;
+}
+RC MysqlCommunicator::write_tuple_result(
+    SqlResult *sql_result, string &packet, int &affected_rows, bool &need_disconnect)
+{
+  Tuple *tuple = nullptr;
+  RC     rc    = RC::SUCCESS;
+  while (RC::SUCCESS == (rc = sql_result->next_tuple(tuple))) {
+    assert(tuple != nullptr);
+
+    affected_rows++;
+
+    const int cell_num = tuple->cell_num();
+    if (cell_num == 0) {
+      continue;
+    }
+
+    // https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query_response_text_resultset.html
+    // https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query_response_text_resultset_row.html
+    // note: if some field is null, send a 0xFB
+    int   pos = 0;
+    char *buf = packet.data();
+
+    pos += 3;
+    pos += store_int1(buf + pos, sequence_id_++);
+
+    Value value;
+    for (int i = 0; i < cell_num; i++) {
+      rc = tuple->cell_at(i, value);
+      if (rc != RC::SUCCESS) {
+        sql_result->set_return_code(rc);
+        break;  // TODO send error packet
+      }
+      std::string value_str = value.to_string();
+      int         len       = value_str.size();
+
+      if (packet.size() < len + pos + 8) {
+        if (packet.size() == 64) {
+          packet.resize(1024);
+        } else {
+          packet.resize(packet.size() * 2);
+        }
+      }
+      pos += store_lenenc_int(buf + pos, len);
+      memcpy(buf + pos, value_str.c_str(), len);
+      pos += len;
+    }
+
+    int payload_length = pos - 4;
+    store_int3(buf, payload_length);
+    rc = writer_->writen(buf, pos);
+    if (OB_FAIL(rc)) {
+      LOG_WARN("failed to send row packet to client. addr=%s, error=%s", addr(), strerror(errno));
+      need_disconnect = true;
+      return rc;
     }
   }
   return rc;

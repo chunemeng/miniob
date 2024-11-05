@@ -52,7 +52,7 @@ IF (ENABLE_NOPIE)
 ENDIF (ENABLE_NOPIE)
 
 # Requires support for avx2
-set (CMAKE_COMMON_FLAGS "${CMAKE_COMMON_FLAGS} -mavx -mavx2")
+set (CMAKE_COMMON_FLAGS "${CMAKE_COMMON_FLAGS} -mavx2")
 
 IF(DEBUG)
     MESSAGE(STATUS "DEBUG has been set as TRUE ${DEBUG}")
