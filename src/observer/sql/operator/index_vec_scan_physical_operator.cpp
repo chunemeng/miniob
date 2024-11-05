@@ -19,6 +19,11 @@ RC IndexVecScanPhysicalOperator::open(Trx *trx)
   Value              v;
   Value::cast_to(value_, AttrType::VECTORS, v);
 
+  if (index->get_dim() != v.length()) {
+    LOG_WARN("invalid vector size");
+    return RC::INTERNAL;
+  }
+
   rids_ = index->ann_search_p(reinterpret_cast<const float *>(v.data()), type_, limit_);
 
   record_handler_ = table_->record_handler();

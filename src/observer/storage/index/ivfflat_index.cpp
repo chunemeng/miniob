@@ -1259,9 +1259,9 @@ std::vector<RID> IvfFileHandler::ann_search_p(const float *base_vector, Distance
     q.pop();
   }
 
-  result.resize(limit);
+  result.reserve(limit);
   while (!result_q.empty()) {
-    result[result_q.size() - 1] = result_q.top().rid;
+    result.emplace_back(result_q.top().rid);
     result_q.pop();
   }
   return result;
