@@ -24,6 +24,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/lang/sstream.h"
 #include "common/log/log.h"
 #include "common/os/os.h"
+#include <unordered_set>
 
 namespace common {
 
@@ -158,9 +159,11 @@ public:
 
 protected:
   list<T *> pools;
-  set<T *>  used;
-  list<T *> frees;
-  int       item_num_per_pool;
+  // NOTE: c++指针大小比较是UB吧(?)
+  // set<T *>  used;
+  std::unordered_set<T *> used;
+  list<T *>               frees;
+  int                     item_num_per_pool;
 };
 
 template <class T>
@@ -335,8 +338,7 @@ public:
    * @param item_num_per_p, how many items per pool.
    * @return
    */
-  int init(int item_s, bool dy = true, int pool_num = DEFAULT_POOL_NUM,
-      int item_num_per_p = DEFAULT_ITEM_NUM_PER_POOL);
+  int init(int item_s, bool dy = true, int pool_num = DEFAULT_POOL_NUM, int item_num_per_p = DEFAULT_ITEM_NUM_PER_POOL);
 
   /**
    * Do cleanup job for memory pool
