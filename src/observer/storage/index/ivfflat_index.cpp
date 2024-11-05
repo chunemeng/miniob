@@ -2,6 +2,7 @@
 #include "storage/table/table.h"
 #include "storage/db/db.h"
 #include <queue>
+#include <random>
 
 RC IvfflatIndex::create(Table *table, const char *file_name, const IndexMeta &index_meta, const FieldMeta &field_meta)
 {
@@ -253,7 +254,11 @@ RC IvfflatIndexHandler::train(int lists, int probes, DistanceType distance_type)
   header_dirty_                   = true;
   frame->mark_dirty();
 
+
   ivf_file_handler_.init_vec_info(dim, lists, probes, distance_type, data_file_handler_);
+
+  lists *= 2;
+
 
   std::vector<std::vector<float>> last(lists, std::vector<float>(dim, 0));
   std::vector<std::vector<float>> cur(lists, std::vector<float>(dim, 0));
@@ -261,7 +266,7 @@ RC IvfflatIndexHandler::train(int lists, int probes, DistanceType distance_type)
 
   dis_calc_.init(distance_type);
 
-  int             times = 2;
+  int             times = 3;
   DataFileScanner scanner;
   int             init = 0;
   LOG_INFO("Start to train index.");
@@ -1011,7 +1016,7 @@ RC IvfFileHandler::init(DiskBufferPool &buffer_pool, LogHandler &log_handler)
 RC IvfFileHandler::init_vec_info(int dim, int lists, int probes, DistanceType distance_type, DataFileHandler &handler)
 {
   dim_                     = dim;
-  list_                    = lists;
+  list_                    = lists * 2;
   probes_                  = probes;
   data_file_handler_       = &handler;
   int record_size          = dim_ * sizeof(float);
@@ -1207,7 +1212,6 @@ std::vector<RID> IvfFileHandler::ann_search_p(const float *base_vector, Distance
 
     IvfBucketPage *bucket        = reinterpret_cast<IvfBucketPage *>(frame->data());
     PageNum        next_page_num = BP_INVALID_PAGE_NUM;
-
     do {
       if (next_page_num != BP_INVALID_PAGE_NUM) {
         rc = disk_buffer_pool_->get_this_page(bucket->next_page_num, &frame);
@@ -1236,7 +1240,7 @@ std::vector<RID> IvfFileHandler::ann_search_p(const float *base_vector, Distance
 
       next_page_num = bucket->next_page_num;
       frame->unpin();
-    } while (bucket->next_page_num != BP_INVALID_PAGE_NUM);
+    } while (next_page_num != BP_INVALID_PAGE_NUM);
 
     q.pop();
   }
