@@ -309,6 +309,9 @@ RC IvfflatIndexHandler::train(int lists, int probes, DistanceType distance_type)
     scanner.close_scan();
     LOG_INFO("train index times=%d", ii);
   }
+  if (num_rel == 0) {
+    lists = 0;
+  }
 
   LOG_INFO("Start to insert record into cluster.");
 
@@ -1213,7 +1216,6 @@ std::vector<RID> IvfFileHandler::ann_search_p(const float *base_vector, Distance
 
   while (!q.empty()) {
     Frame *frame = nullptr;
-    LOG_INFO("offset:%d", q.top().offset);
     RC     rc    = disk_buffer_pool_->get_this_page(
         offset_page_num_ + q.top().offset / offset_per_page * (1 + offset_per_page) + 1 + q.top().offset, &frame);
 
