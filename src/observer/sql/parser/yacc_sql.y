@@ -252,6 +252,8 @@ UnboundAggregateExpr *create_aggregate_expression(AggrType aggregate_name,
 %type <expression_list>     order_by
 %type <expression_list>     order_by_list
 %type <expression_list>     assign_list
+%type <relation_list>       view_field_list
+%type <relation_list>       view_fields
 %type <number>              null_t
 %type <string>              relation
 %type <comp>                comp_op
@@ -450,6 +452,34 @@ vec_index_param:
     }
     ;
 
+view_fields:
+    ID {
+      $$ = new std::vector<std::string>();
+        $$->insert($$->begin(), $1);
+      free($1);
+    }
+    | ID COMMA view_fields {
+      if ($3 != nullptr) {
+        $$ = $3;
+      } else {
+        $$ = new std::vector<std::string>;
+      }
+      $$->insert($$->begin(), $1);
+      free($1);
+    }
+    ;
+
+view_field_list:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | LBRACE view_fields RBRACE {
+      $$ = $2;
+    }
+    ;
+
+
 view_select_stmt:
     AS select_stmt {
           delete $2;
@@ -459,12 +489,16 @@ view_select_stmt:
     ;
 
 create_view_stmt:
-    CREATE VIEW ID view_select_stmt storage_format{
-        $$ = $4;
+    CREATE VIEW ID view_field_list view_select_stmt storage_format{
+        $$ = $5;
         $$->create_view.relation_name = $3;
-        if ($5 != nullptr) {
-          $$->create_view.storage_format = $5;
-          free($5);
+        if ($4 != nullptr) {
+            $$->create_view.alias.swap(*$4);
+            delete $4;
+        }
+        if ($6 != nullptr) {
+          $$->create_view.storage_format = $6;
+          free($6);
         }
         free($3);
     };

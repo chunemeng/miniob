@@ -30,24 +30,31 @@ class Db;
 class CreateViewStmt : public Stmt
 {
 public:
-  CreateViewStmt(std::string &table_name, std::string &select, SelectStmt *stmt, StorageFormat storage_format)
-      : select_str_(select), table_name_(table_name), select_stmt_(stmt), storage_format_(storage_format)
+  CreateViewStmt(std::string &table_name, std::string &select, SelectStmt *stmt, std::vector<std::string> &alias,
+      StorageFormat storage_format)
+      : select_str_(select),
+        table_name_(table_name),
+        select_stmt_(stmt),
+        column_names_(std::move(alias)),
+        storage_format_(storage_format)
   {}
   virtual ~CreateViewStmt() = default;
 
   StmtType type() const override { return StmtType::CREATE_VIEW; }
 
-  const std::string  &table_name() const { return table_name_; }
-  const StorageFormat storage_format() const { return storage_format_; }
-  SelectStmt         *select_stmt() { return select_stmt_; }
-  std::string        &select_str() { return select_str_; }
+  const std::string        &table_name() const { return table_name_; }
+  const StorageFormat       storage_format() const { return storage_format_; }
+  SelectStmt               *select_stmt() { return select_stmt_; }
+  std::string              &select_str() { return select_str_; }
+  std::vector<std::string> &column_names() { return column_names_; }
 
   static RC            create(Db *db, CreateViewSqlNode &create_table, Stmt *&stmt);
   static StorageFormat get_storage_format(const char *format_str);
 
 private:
-  std::string   select_str_;
-  std::string   table_name_;
-  SelectStmt   *select_stmt_;
-  StorageFormat storage_format_;
+  std::string              select_str_;
+  std::string              table_name_;
+  SelectStmt              *select_stmt_;
+  std::vector<std::string> column_names_;
+  StorageFormat            storage_format_;
 };

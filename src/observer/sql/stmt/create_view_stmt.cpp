@@ -33,7 +33,8 @@ RC CreateViewStmt::create(Db *db, CreateViewSqlNode &create_table, Stmt *&stmt)
   if (rc != RC::SUCCESS) {
     return rc;
   }
-  stmt = new CreateViewStmt(create_table.relation_name, s, static_cast<SelectStmt *>(select_stmt), storage_format);
+  stmt = new CreateViewStmt(
+      create_table.relation_name, s, static_cast<SelectStmt *>(select_stmt), create_table.alias, storage_format);
   return RC::SUCCESS;
 }
 

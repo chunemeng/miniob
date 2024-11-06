@@ -22,14 +22,29 @@ RC CreateViewExecutor::execute(SQLStageEvent *sql_event)
 
   std::vector<AttrInfoSqlNode> attr_infos;
 
-  for (auto &attr : create_table_stmt->select_stmt()->query_expressions()) {
+  auto &exprs = create_table_stmt->select_stmt()->query_expressions();
+
+  auto &column_names = create_table_stmt->column_names();
+
+  if (!column_names.empty() && exprs.size() != create_table_stmt->column_names().size()) {
+    LOG_ERROR("create table failed, no attributes");
+    return RC::INVALID_ARGUMENT;
+  }
+  bool has_column_names = !column_names.empty();
+
+  for (int i = 0; i < exprs.size(); i++) {
     AttrInfoSqlNode attr_info;
-    attr_info.name     = attr->get_name();
-    attr_info.type     = attr->value_type();
-    attr_info.length   = attr->value_length();
+    if (has_column_names) {
+      attr_info.name = column_names[i];
+    } else {
+      attr_info.name = exprs[i]->name();
+    }
+    attr_info.type     = exprs[i]->value_type();
+    attr_info.length   = exprs[i]->value_length();
     attr_info.nullable = true;
     attr_infos.emplace_back(attr_info);
   }
+
   AttrInfoSqlNode attr_info;
   attr_info.name   = "__view_table";
   attr_info.type   = AttrType::CHARS;

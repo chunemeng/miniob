@@ -269,6 +269,9 @@ RC LogicalPlanGenerator::create_plan(InsertStmt *insert_stmt, unique_ptr<Logical
         for (int j = 0; j < tables.size(); j++) {
           if (tables[j]->name() == table_name) {
             auto field_meta                       = tables[j]->table_meta().field(field_name);
+            if (field_meta == nullptr) {
+              continue;
+            }
             new_values[j][field_meta->field_id()] = value;
             break;
           }

@@ -200,9 +200,10 @@ struct CreateTableSqlNode
 
 struct CreateViewSqlNode
 {
-  std::string relation_name;   ///< Relation name
-  std::string select_stmt;     ///< select statement
-  std::string storage_format;  ///< storage format
+  std::string              relation_name;   ///< Relation name
+  std::string              select_stmt;     ///< select statement
+  std::vector<std::string> alias;           ///< attributes
+  std::string              storage_format;  ///< storage format
 };
 
 /**
