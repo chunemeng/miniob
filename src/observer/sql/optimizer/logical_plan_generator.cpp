@@ -255,7 +255,7 @@ RC LogicalPlanGenerator::create_plan(InsertStmt *insert_stmt, unique_ptr<Logical
     for (int i = 0; i < tables.size(); i++) {
       auto  table_meta = tables[i]->table_meta();
       Value v;
-      v.set_null();
+      v.set_null_chars();
       new_values[i].resize(table_meta.field_num() - table_meta.sys_field_num(), v);
     }
 
@@ -268,7 +268,7 @@ RC LogicalPlanGenerator::create_plan(InsertStmt *insert_stmt, unique_ptr<Logical
         auto field_name = field_expr->field_name();
         for (int j = 0; j < tables.size(); j++) {
           if (tables[j]->name() == table_name) {
-            auto field_meta                       = tables[j]->table_meta().field(field_name);
+            auto field_meta = tables[j]->table_meta().field(field_name);
             if (field_meta == nullptr) {
               continue;
             }

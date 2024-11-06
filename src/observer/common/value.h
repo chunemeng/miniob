@@ -113,14 +113,20 @@ public:
     return DataType::type_instance(from_type)->cast_cost(to_type);
   }
 
-  void     set_type(AttrType type) { this->attr_type_ = type; }
-  void     set_data(char *data, int length);
-  void     set_data(const char *data, int length) { this->set_data(const_cast<char *>(data), length); }
-  void     set_value(const Value &value);
-  void     set_boolean(bool val);
-  void     set_null(int len = 0);
-  void     set_vector(float *vec, int len, bool own_data = true);
-  void     set_vector(std::vector<float> &vec);
+  void set_type(AttrType type) { this->attr_type_ = type; }
+  void set_null_chars()
+  {
+    this->attr_type_            = AttrType::CHARS;
+    this->value_.pointer_value_ = nullptr;
+    this->length_               = 0;
+  };
+  void set_data(char *data, int length);
+  void set_data(const char *data, int length) { this->set_data(const_cast<char *>(data), length); }
+  void set_value(const Value &value);
+  void set_boolean(bool val);
+  void set_null(int len = 0);
+  void set_vector(float *vec, int len, bool own_data = true);
+  void set_vector(std::vector<float> &vec);
 
   string to_string() const;
 
