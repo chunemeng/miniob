@@ -28,18 +28,21 @@ class InsertStmt : public Stmt
 {
 public:
   InsertStmt() = default;
-  InsertStmt(Table *table, std::vector<Value>& values) : table_(table), values_(std::move(values)) {};
+  InsertStmt(Table *table, std::vector<std::string> &columns, std::vector<Value> &values)
+      : table_(table), columns_(std::move(columns)), values_(std::move(values)){};
 
   StmtType type() const override { return StmtType::INSERT; }
 
 public:
-  static RC create(Db *db,InsertSqlNode &insert_sql, Stmt *&stmt);
+  static RC create(Db *db, InsertSqlNode &insert_sql, Stmt *&stmt);
 
 public:
   Table              *table() const { return table_; }
   std::vector<Value> &values() { return values_; }
+  std::vector<std::string> &columns() { return columns_; }
 
 private:
-  Table             *table_ = nullptr;
-  std::vector<Value> values_;
+  Table                   *table_ = nullptr;
+  std::vector<std::string> columns_;
+  std::vector<Value>       values_;
 };

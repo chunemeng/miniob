@@ -43,6 +43,6 @@ RC InsertStmt::create(Db *db, InsertSqlNode &inserts, Stmt *&stmt)
   }
 
   // everything alright
-  stmt = new InsertStmt(table, inserts.values);
+  stmt = new InsertStmt(table, inserts.columns, inserts.values);
   return RC::SUCCESS;
 }

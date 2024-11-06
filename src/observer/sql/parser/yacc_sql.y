@@ -695,17 +695,23 @@ type:
     | TEXT_T   { $$ = static_cast<int>(AttrType::TEXTS); }
     ;
 insert_stmt:        /*insert   语句的语法解析树*/
-    INSERT INTO ID VALUES LBRACE value value_list RBRACE
+    INSERT INTO ID view_field_list VALUES LBRACE value value_list RBRACE
     {
       $$ = new ParsedSqlNode(SCF_INSERT);
       $$->insertion.relation_name = $3;
-      if ($7 != nullptr) {
-        $$->insertion.values.swap(*$7);
-        delete $7;
+
+      if ($4 != nullptr) {
+        $$->insertion.columns.swap(*$4);
+        delete $4;
       }
-      $$->insertion.values.emplace_back(*$6);
+
+      if ($8 != nullptr) {
+        $$->insertion.values.swap(*$8);
+        delete $8;
+      }
+      $$->insertion.values.emplace_back(*$7);
       std::reverse($$->insertion.values.begin(), $$->insertion.values.end());
-      delete $6;
+      delete $7;
       free($3);
     }
     ;

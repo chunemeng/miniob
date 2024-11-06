@@ -43,7 +43,7 @@ static void wildcard_fields(
     FieldExpr *field_expr = new FieldExpr(field);
 
     // NOTE: USE STAR WILL NO FIELD ALIAS
-    if (should_alis) {
+    if (should_alis && !is_blank(table_name)) {
       field_expr->set_name(table_name + "." + field.field_name());
     } else {
       field_expr->set_name(field.field_name());
@@ -211,7 +211,11 @@ RC ExpressionBinder::bind_unbound_field_expression(
     if (unbound_field_expr->is_alias()) {
       field_expr->set_name(unbound_field_expr->name());
     } else if (should_alis) {
-      field_expr->set_name(table_name + "." + field_name);
+      if (is_blank(table_name)) {
+        field_expr->set_name(field_name);
+      } else {
+        field_expr->set_name(table_name + "." + field_name);
+      }
     } else {
       field_expr->set_name(field_name);
     }

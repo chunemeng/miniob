@@ -240,6 +240,35 @@ RC LogicalPlanGenerator::create_plan(InsertStmt *insert_stmt, unique_ptr<Logical
 {
   Table *table = insert_stmt->table();
 
+  std::vector<Value> values = std::move(insert_stmt->values());
+  if (!insert_stmt->columns().empty()) [[unlikely]] {
+    if (values.size() != insert_stmt->columns().size()) {
+      LOG_WARN("column size not equal to value size");
+      return RC::INVALID_ARGUMENT;
+    }
+    auto  table_meta = table->table_meta();
+    auto &columns    = insert_stmt->columns();
+    Value v;
+    v.set_null_chars();
+    std::vector<Value> new_values(columns.size(), v);
+
+    for (int i = 0; i < columns.size(); i++) {
+      auto field_meta = table_meta.field(columns[i]);
+      if (field_meta == nullptr) {
+        LOG_WARN("field not found");
+        return RC::INVALID_ARGUMENT;
+      }
+      if (new_values[field_meta->field_id()].attr_type() == AttrType::CHARS &&
+          new_values[field_meta->field_id()].length() == 0) {
+        new_values[field_meta->field_id()] = (values)[i];
+      } else {
+        LOG_INFO("field repeat");
+        return RC::INVALID_ARGUMENT;
+      }
+    }
+    values = std::move(new_values);
+  }
+
   if (table->table_meta().is_view()) {
     Stmt *select_stmt = nullptr;
     RC    rc          = SelectStmt::create_select_from_str(table, select_stmt);
@@ -250,7 +279,6 @@ RC LogicalPlanGenerator::create_plan(InsertStmt *insert_stmt, unique_ptr<Logical
     SelectStmt *select_stmt_cast = static_cast<SelectStmt *>(select_stmt);
 
     const auto                     &tables = select_stmt_cast->tables();
-    auto                           &values = insert_stmt->values();
     std::vector<std::vector<Value>> new_values(select_stmt_cast->tables().size());
     for (int i = 0; i < tables.size(); i++) {
       auto  table_meta = tables[i]->table_meta();
@@ -260,7 +288,7 @@ RC LogicalPlanGenerator::create_plan(InsertStmt *insert_stmt, unique_ptr<Logical
     }
 
     for (int i = 0; i < values.size(); i++) {
-      auto &value = values[i];
+      auto &value = (values)[i];
       auto &expr  = select_stmt_cast->query_expressions()[i];
       if (expr->type() == ExprType::FIELD) {
         auto field_expr = dynamic_cast<FieldExpr *>(expr.get());
@@ -295,7 +323,7 @@ RC LogicalPlanGenerator::create_plan(InsertStmt *insert_stmt, unique_ptr<Logical
     return RC::SUCCESS;
   }
 
-  InsertLogicalOperator *insert_operator = new InsertLogicalOperator(table, insert_stmt->values());
+  InsertLogicalOperator *insert_operator = new InsertLogicalOperator(table, values);
   logical_operator.reset(insert_operator);
   return RC::SUCCESS;
 }
