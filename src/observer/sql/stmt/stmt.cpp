@@ -31,6 +31,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/show_tables_stmt.h"
 #include "sql/stmt/trx_begin_stmt.h"
 #include "sql/stmt/trx_end_stmt.h"
+#include "create_view_stmt.h"
 
 bool stmt_type_ddl(StmtType type)
 {
@@ -116,6 +117,9 @@ RC Stmt::create_stmt(Db *db, ParsedSqlNode &sql_node, Stmt *&stmt)
     case SCF_UPDATE: {
       return UpdateStmt::create(db, sql_node.update, stmt);
     }
+    case SCF_CREATE_VIEW: {
+      return CreateViewStmt::create(db, sql_node.create_view, stmt);
+    } break;
 
     default: {
       LOG_INFO("Command::type %d doesn't need to create statement.", sql_node.flag);

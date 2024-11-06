@@ -66,6 +66,9 @@ public:
   RC create_table(const char *table_name, span<const AttrInfoSqlNode> attributes,
       const StorageFormat storage_format = StorageFormat::ROW_FORMAT);
 
+  RC create_view(const char *table_name, span<const AttrInfoSqlNode> attributes,std::string& select_str,
+      const StorageFormat storage_format = StorageFormat::ROW_FORMAT);
+
   /**
    * @brief 删除一个表
    * @param table_name 表名

@@ -149,6 +149,7 @@ MAX                                     RETURN_TOKEN(MAX);
 MIN                                     RETURN_TOKEN(MIN);
 L2_DISTANCE                             RETURN_TOKEN(L2_DIST);
 COSINE_DISTANCE                         RETURN_TOKEN(COS_DIST);
+VIEW                                    RETURN_TOKEN(VIEW);
 INNER_PRODUCT                           RETURN_TOKEN(INNER_PRODUCT);
 EXISTS                                  RETURN_TOKEN(EXISTS);
 SUM                                     RETURN_TOKEN(SUM);

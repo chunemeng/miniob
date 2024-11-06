@@ -185,8 +185,9 @@ public:
     }
     this->speces_.clear();
     this->speces_.reserve(fields->size());
-    for (const FieldMeta &field : *fields) {
-      speces_.push_back(new FieldExpr(table, &field));
+    ASSERT(!fields->empty(), "record_ is nullptr");
+    for (int i = 0; i < static_cast<int>(fields->size()); i++) {
+      speces_.push_back(new FieldExpr(table, &(*fields)[i]));
     }
   }
 
@@ -217,7 +218,7 @@ public:
         char *str      = new char[len + 1];
         int   page_num = (len + BP_PAGE_DATA_SIZE - 1) / BP_PAGE_DATA_SIZE;
         RC    rc       = table_->read_from_big_page(str, len, bp, page_num);
-        str[len] = '\0';
+        str[len]       = '\0';
         if (rc != RC::SUCCESS) {
           delete[] str;
           return rc;
@@ -225,8 +226,8 @@ public:
         cell.set_type(field_meta->type());
         cell.set_data(str, len);
       } else if (field_meta->type() == AttrType::HIGH_DIMS) {
-        auto bp        = reinterpret_cast<int32_t *>(record_->data() + field_meta->offset());
-        int  len       = field_meta->real_len() * sizeof(float);
+        auto bp  = reinterpret_cast<int32_t *>(record_->data() + field_meta->offset());
+        int  len = field_meta->real_len() * sizeof(float);
 
         char *str      = new char[len];
         int   page_num = field_meta->len() / sizeof(int);
@@ -389,15 +390,10 @@ public:
   void set_cells(const std::vector<Value> &cells) { cells_ = cells; }
   void set_cells(std::vector<Value> &&cells) { cells_ = std::move(cells); }
 
-  virtual int cell_num() const override
-  {
-    LOG_INFO("cell_num=%d", static_cast<int>(cells_.size()));
-    return static_cast<int>(cells_.size());
-  }
+  virtual int cell_num() const override { return static_cast<int>(cells_.size()); }
 
   virtual RC cell_at(int index, Value &cell) const override
   {
-    LOG_INFO("cell_at index=%d", index);
     if (index < 0 || index >= cell_num()) {
       return RC::NOTFOUND;
     }
@@ -430,7 +426,6 @@ public:
 
   virtual RC find_cell(const TupleCellSpec &spec, Value &cell) const override
   {
-    ASSERT(cells_.size() == specs_.size(), "cells_.size()=%d, specs_.size()=%d", cells_.size(), specs_.size());
 
     const int size = static_cast<int>(specs_.size());
     for (int i = 0; i < size; i++) {
@@ -440,6 +435,53 @@ public:
       }
     }
     return RC::NOTFOUND;
+  }
+
+  RC update_value(const Tuple *tuple)
+  {
+    const int cell_num = tuple->cell_num();
+    for (int i = 0; i < cell_num; i++) {
+      Value cell;
+      RC    rc = tuple->cell_at(i, cell);
+      if (OB_FAIL(rc)) {
+        return rc;
+      }
+
+      cells_[i] = cell;
+    }
+    return RC::SUCCESS;
+  }
+
+  RC set_schema(Table* table,span<const FieldMeta> fields)
+  {
+    cells_.resize(fields.size());
+    specs_.reserve(fields.size());
+    for (auto & field : fields) {
+      specs_.emplace_back(table->name(), field.name());
+    }
+    return RC::SUCCESS;
+  }
+
+  static RC make(const Tuple *tuple, ValueListTuple *value_list)
+  {
+    const int cell_num = tuple->cell_num();
+    for (int i = 0; i < cell_num; i++) {
+      Value cell;
+      RC    rc = tuple->cell_at(i, cell);
+      if (OB_FAIL(rc)) {
+        return rc;
+      }
+
+      TupleCellSpec spec;
+      rc = tuple->spec_at(i, spec);
+      if (OB_FAIL(rc)) {
+        return rc;
+      }
+
+      value_list->cells_.push_back(cell);
+      value_list->specs_.push_back(spec);
+    }
+    return RC::SUCCESS;
   }
 
   static RC make(const Tuple &tuple, ValueListTuple &value_list)

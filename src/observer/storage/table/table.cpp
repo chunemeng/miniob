@@ -59,7 +59,7 @@ Table::~Table()
 }
 
 RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, const char *base_dir,
-    span<const AttrInfoSqlNode> attributes, StorageFormat storage_format)
+    span<const AttrInfoSqlNode> attributes, StorageFormat storage_format, bool is_view)
 {
   if (table_id < 0) {
     LOG_WARN("invalid table id. table_id=%d, table_name=%s", table_id, name);
@@ -95,7 +95,7 @@ RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, c
 
   // 创建文件
   const vector<FieldMeta> *trx_fields = db->trx_kit().trx_fields();
-  if ((rc = table_meta_.init(table_id, name, trx_fields, attributes, storage_format)) != RC::SUCCESS) {
+  if ((rc = table_meta_.init(table_id, name, trx_fields, attributes, storage_format, is_view)) != RC::SUCCESS) {
     LOG_ERROR("Failed to init table meta. name:%s, ret:%d", name, rc);
     return rc;  // delete table file
   }
@@ -1186,11 +1186,12 @@ RC Table::create_vector_index(Trx *trx, int lists, int probs, DistanceType type,
   return rc;
 }
 
-Index *Table::find_index(const string &index_name) const {
+Index *Table::find_index(const string &index_name) const
+{
   for (Index *index : indexes_) {
     auto meta = index->index_meta();
     if (meta.field().size() == 2) {
-      if (meta.field()[1] ==  index_name) {
+      if (meta.field()[1] == index_name) {
         return index;
       }
     }

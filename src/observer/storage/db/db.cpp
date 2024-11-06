@@ -430,3 +430,43 @@ RC Db::init_dblwr_buffer()
 LogHandler        &Db::log_handler() { return *log_handler_; }
 BufferPoolManager &Db::buffer_pool_manager() { return *buffer_pool_manager_; }
 TrxKit            &Db::trx_kit() { return *trx_kit_; }
+RC Db::create_view(const char *table_name, span<const AttrInfoSqlNode> attributes, std::string &select_str,
+    const StorageFormat storage_format)
+{
+  RC rc = RC::SUCCESS;
+  // check table_name
+  if (opened_tables_.count(table_name) != 0) {
+    LOG_WARN("%s has been opened before.", table_name);
+    return RC::SCHEMA_TABLE_EXIST;
+  }
+
+  // 文件路径可以移到Table模块
+  string  table_file_path = table_meta_file(path_.c_str(), table_name);
+  Table  *table           = new Table();
+  int32_t table_id        = next_table_id_++;
+  rc                      = table->create(
+      this, table_id, table_file_path.c_str(), table_name, path_.c_str(), attributes, storage_format, true);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to create table %s.", table_name);
+    delete table;
+    return rc;
+  }
+
+  Record record;
+  int    len = table->table_meta().record_size();
+  record.new_record(len);
+  // NOTE:LEAVE FOR '\0'
+  memcpy(record.data() + len - select_str.size() - 1, select_str.c_str(), select_str.size());
+  record.data()[len - 1] = '\0';
+  rc                     = table->insert_record(record);
+
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to create table %s.", table_name);
+    delete table;
+    return rc;
+  }
+
+  opened_tables_[table_name] = table;
+  LOG_INFO("Create table success. table name=%s, table_id:%d", table_name, table_id);
+  return RC::SUCCESS;
+}

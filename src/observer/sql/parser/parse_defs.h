@@ -20,7 +20,6 @@ See the Mulan PSL v2 for more details. */
 
 #include "common/value.h"
 
-
 class Expression;
 
 /**
@@ -199,6 +198,13 @@ struct CreateTableSqlNode
   std::string                    storage_format;  ///< storage format
 };
 
+struct CreateViewSqlNode
+{
+  std::string relation_name;   ///< Relation name
+  std::string select_stmt;     ///< select statement
+  std::string storage_format;  ///< storage format
+};
+
 /**
  * @brief 描述一个drop table语句
  * @ingroup SQLParser
@@ -306,6 +312,7 @@ enum SqlCommandFlag
   SCF_INSERT,
   SCF_UPDATE,
   SCF_DELETE,
+  SCF_CREATE_VIEW,
   SCF_CREATE_TABLE,
   SCF_DROP_TABLE,
   SCF_CREATE_INDEX,
@@ -344,6 +351,7 @@ public:
   DescTableSqlNode    desc_table;
   LoadDataSqlNode     load_data;
   ExplainSqlNode      explain;
+  CreateViewSqlNode   create_view;
   SetVariableSqlNode  set_variable;
   InnerJoinSqlNode    inner_join;
 

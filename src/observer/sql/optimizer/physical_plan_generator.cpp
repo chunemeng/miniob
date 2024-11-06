@@ -145,6 +145,27 @@ RC PhysicalPlanGenerator::create_plan(TableGetLogicalOperator &table_get_oper, u
   // 看看是否有可以用于索引查找的表达式
   Table *table = table_get_oper.table();
 
+  if (table->table_meta().is_view()) [[unlikely]] {
+    if (table_get_oper.children().size() != 1) {
+      LOG_WARN("view operator should have 1 child");
+      return RC::INVALID_ARGUMENT;
+    }
+    std::unique_ptr<PhysicalOperator> child_oper;
+    RC                                rc = create(*table_get_oper.children().front(), child_oper);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to create child operator of view operator. rc=%s", strrc(rc));
+      return rc;
+    }
+
+    auto table_scan_oper = new TableScanPhysicalOperator(table, table_get_oper.read_write_mode());
+    table_scan_oper->set_view(true);
+    table_scan_oper->set_predicates(std::move(predicates));
+    table_scan_oper->add_child(std::move(child_oper));
+    oper = unique_ptr<PhysicalOperator>(table_scan_oper);
+    LOG_TRACE("use table scan");
+    return RC::SUCCESS;
+  }
+
   Index     *index      = nullptr;
   ValueExpr *value_expr = nullptr;
   if (table_get_oper.is_vector_scanner()) {
@@ -168,7 +189,7 @@ RC PhysicalPlanGenerator::create_plan(TableGetLogicalOperator &table_get_oper, u
       value_expr = static_cast<ValueExpr *>(left_expr.get());
     }
 
-    index              = table->find_index(field_expr->field_name());
+    index = table->find_index(field_expr->field_name());
 
     const Value                  &value           = value_expr->get_value();
     IndexVecScanPhysicalOperator *index_scan_oper = new IndexVecScanPhysicalOperator(table,
@@ -299,9 +320,20 @@ RC PhysicalPlanGenerator::create_plan(ProjectLogicalOperator &project_oper, uniq
 
 RC PhysicalPlanGenerator::create_plan(InsertLogicalOperator &insert_oper, unique_ptr<PhysicalOperator> &oper)
 {
-  Table                  *table           = insert_oper.table();
-  vector<Value>          &values          = insert_oper.values();
-  InsertPhysicalOperator *insert_phy_oper = new InsertPhysicalOperator(table, std::move(values));
+  Table                            *table           = insert_oper.table();
+  vector<Value>                    &values          = insert_oper.values();
+  InsertPhysicalOperator           *insert_phy_oper = new InsertPhysicalOperator(table, std::move(values));
+  std::unique_ptr<PhysicalOperator> child_oper;
+  if (!insert_oper.children().empty()) {
+    LogicalOperator *child_logical_oper = insert_oper.children().front().get();
+    RC               rc                 = create(*child_logical_oper, child_oper);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to create child physical operator of insert operator. rc=%s", strrc(rc));
+      return rc;
+    }
+    insert_phy_oper->add_child(std::move(child_oper));
+  }
+
   oper.reset(insert_phy_oper);
   return RC::SUCCESS;
 }

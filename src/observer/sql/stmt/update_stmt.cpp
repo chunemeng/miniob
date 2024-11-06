@@ -20,6 +20,7 @@ See the Mulan PSL v2 for more details. */
 #include "storage/db/db.h"
 #include "storage/table/table.h"
 #include "sql/parser/expression_binder.h"
+#include "select_stmt.h"
 
 UpdateStmt::UpdateStmt(Table *table, std::vector<std::unique_ptr<Expression>> &value,
     std::vector<const FieldMeta *> &field_meta, FilterStmt *filter_stmt)
@@ -54,15 +55,38 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
   }
 
   ExpressionBinder binder(binder_context);
-  const auto      &table_meta = table->table_meta();
-  auto            &exprs      = update.expressions;
+  auto            &exprs = update.expressions;
 
   std::vector<std::unique_ptr<Expression>> expr;
   expr.reserve(exprs.size());
   std::vector<const FieldMeta *> fields;
   fields.reserve(exprs.size());
 
-  RC rc = RC::SUCCESS;
+  RC     rc        = RC::SUCCESS;
+  Table *old_table = nullptr;
+
+  if (table->table_meta().is_view()) {
+    Stmt *stmt_tmp = nullptr;
+    rc             = SelectStmt::create_select_from_str(table, stmt_tmp);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to create select statement. rc=%d:%s", rc, strrc(rc));
+      return rc;
+    }
+    SelectStmt *select_stmt = dynamic_cast<SelectStmt *>(stmt_tmp);
+    if (nullptr == select_stmt) {
+      LOG_WARN("failed to cast stmt to select stmt.");
+      return RC::NOT_EXIST;
+    }
+    if (select_stmt->tables().size() != 1) {
+      LOG_WARN("failed to get table from select stmt.");
+      // NOTE: 有点繁琐了，暂时不想支持
+      return RC::INVALID_ARGUMENT;
+    }
+    old_table = table;
+    table     = select_stmt->tables()[0];
+  }
+
+  const auto &table_meta = table->table_meta();
 
   for (size_t i = 0; i < exprs.size(); ++i) {
     if (exprs[i]->type() != ExprType::COMPARISON) {
@@ -74,14 +98,26 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
       LOG_WARN("invalid update expr op.");
       return RC::INVALID_ARGUMENT;
     }
-    const FieldMeta *field_meta =
-        table_meta.field(dynamic_cast<UnboundFieldExpr *>(expr_tmp->left().get())->field_name());
-    if (nullptr == field_meta) {
-      LOG_WARN("no such field in table. db=%s, table=%s",
+    if (old_table != nullptr) {
+      // NOTE: AVOID ALIAS
+      auto field_meta =
+          table_meta.field(old_table->table_meta().field(dynamic_cast<UnboundFieldExpr *>(expr_tmp->left().get())->field_name())->name());
+      if (nullptr == field_meta) {
+        LOG_WARN("no such field in table. db=%s, table=%s",
+                db->name(), table_name.c_str());
+        return RC::SCHEMA_FIELD_NOT_EXIST;
+      }
+      fields.emplace_back(field_meta);
+    } else {
+      const FieldMeta *field_meta =
+          table_meta.field(dynamic_cast<UnboundFieldExpr *>(expr_tmp->left().get())->field_name());
+      if (nullptr == field_meta) {
+        LOG_WARN("no such field in table. db=%s, table=%s",
           db->name(), table_name.c_str());
-      return RC::SCHEMA_FIELD_NOT_EXIST;
+        return RC::SCHEMA_FIELD_NOT_EXIST;
+      }
+      fields.emplace_back(field_meta);
     }
-    fields.emplace_back(field_meta);
 
     rc = binder.bind_expression(expr_tmp->right(), expr);
     if (rc != RC::SUCCESS) {
@@ -93,7 +129,7 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
   ASSERT(expr.size() == fields.size(), "expr size should be equal to fields size");
 
   FilterStmt *filter_stmt = nullptr;
-  rc = FilterStmt::create(table, update.conditions, filter_stmt);
+  rc                      = FilterStmt::create(table, update.conditions, filter_stmt);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to create filter statement. rc=%d:%s", rc, strrc(rc));
     return rc;

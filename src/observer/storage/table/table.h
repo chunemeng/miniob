@@ -53,7 +53,7 @@ public:
    * @param attributes 字段
    */
   RC create(Db *db, int32_t table_id, const char *path, const char *name, const char *base_dir,
-      span<const AttrInfoSqlNode> attributes, StorageFormat storage_format);
+      span<const AttrInfoSqlNode> attributes, StorageFormat storage_format, bool is_view = false);
 
   /**
    * 打开一个表

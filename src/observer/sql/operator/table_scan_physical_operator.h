@@ -41,18 +41,22 @@ public:
   RC close() override;
 
   Tuple *current_tuple() override;
+  void   set_view(bool is_view) { is_view_ = is_view; }
 
   void set_predicates(std::vector<std::unique_ptr<Expression>> &&exprs);
 
 private:
-  RC filter(RowTuple &tuple, bool &result);
+  RC filter(Tuple *tuple, bool &result);
 
 private:
-  Table                                   *table_ = nullptr;
-  Trx                                     *trx_   = nullptr;
-  ReadWriteMode                            mode_  = ReadWriteMode::READ_WRITE;
+  Table                                   *table_   = nullptr;
+  Trx                                     *trx_     = nullptr;
+  bool                                     is_view_ = false;
+  ReadWriteMode                            mode_    = ReadWriteMode::READ_WRITE;
   RecordFileScanner                        record_scanner_;
   Record                                   current_record_;
   RowTuple                                 tuple_;
+  ValueListTuple                           v_tuple_;
+  int                                      record_size_ = 0;
   std::vector<std::unique_ptr<Expression>> predicates_;  // TODO chang predicate to table tuple filter
 };

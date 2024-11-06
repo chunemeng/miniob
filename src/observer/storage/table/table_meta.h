@@ -39,22 +39,25 @@ public:
   void swap(TableMeta &other) noexcept;
 
   RC init(int32_t table_id, const char *name, const std::vector<FieldMeta> *trx_fields,
-      std::span<const AttrInfoSqlNode> attributes, StorageFormat storage_format);
+      std::span<const AttrInfoSqlNode> attributes, StorageFormat storage_format, bool is_view = false);
 
   RC add_index(const IndexMeta &index);
 
 public:
+  int32_t             view_select_offset() const { return fields_[field_num()].offset(); }
   int32_t             table_id() const { return table_id_; }
+  int32_t             view_select_len() const { return is_view_ ? fields_[field_num()].len() : 0; };
   const char         *name() const;
   const std::string  &name_str() const;
   const FieldMeta    *trx_field() const;
   const FieldMeta    *field(int index) const;
   const FieldMeta    *field(const char *name) const;
-  const FieldMeta    *field(const std::string& name) const;
+  const FieldMeta    *field(const std::string &name) const;
   const FieldMeta    *find_field_by_offset(int offset) const;
   auto                field_metas() const -> const std::vector<FieldMeta>                *{ return &fields_; }
   auto                trx_fields() const -> std::span<const FieldMeta>;
   const StorageFormat storage_format() const { return storage_format_; }
+  bool                is_view() const { return is_view_; }
 
   int field_num() const;  // sys field included
   int sys_field_num() const;
@@ -83,6 +86,7 @@ protected:
   std::vector<FieldMeta> fields_;  // 包含sys_fields and null_fields
   std::vector<IndexMeta> indexes_;
   StorageFormat          storage_format_;
+  bool                   is_view_ = false;
 
   int record_size_ = 0;
 };

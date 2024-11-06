@@ -19,6 +19,7 @@ See the Mulan PSL v2 for more details. */
 #include "storage/db/db.h"
 #include "storage/table/table.h"
 #include "sql/parser/expression_binder.h"
+#include "sql/parser/parse.h"
 
 using namespace std;
 using namespace common;
@@ -31,6 +32,26 @@ SelectStmt::~SelectStmt()
   }
 }
 
+RC SelectStmt::create_select_from_str(Table *table, Stmt *&stmt)
+{
+  RID    rid{1, 0};
+  Record record;
+  RC     rc = table->get_record(rid, record);
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
+  ParsedSqlResult sql_node;
+  parse(record.data() + table->table_meta().view_select_offset(), &sql_node);
+
+  if (sql_node.sql_nodes().size() != 1) {
+    return RC::INVALID_ARGUMENT;
+  }
+
+  SelectSqlNode select = std::move(sql_node.sql_nodes()[0]->selection);
+  rc     = SelectStmt::create(table->db(), select, stmt);
+  return rc;
+}
+
 RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
 {
   if (nullptr == db) {
@@ -40,6 +61,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
 
   BinderContext binder_context;
   binder_context.set_db(db);
+  std::unordered_map<Table *, SelectStmt *> view_map;
 
   // collect tables in `from` statement
   for (size_t i = 0; i < select_sql.relations.size(); i++) {
@@ -53,6 +75,16 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     if (nullptr == table) {
       LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name.relation_name.c_str());
       return RC::SCHEMA_TABLE_NOT_EXIST;
+    }
+
+    if (table->table_meta().is_view()) [[unlikely]] {
+      // TODO: SUPPORT TRX
+      Stmt *view_stmt = nullptr;
+      RC    rc        = create_select_from_str(table, view_stmt);
+      if (rc != RC::SUCCESS) {
+        return rc;
+      }
+      view_map.emplace(table, static_cast<SelectStmt *>(view_stmt));
     }
 
     binder_context.add_table(table_name.relation_name, table);
@@ -181,7 +213,8 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   select_stmt->group_by_.swap(group_by_expressions);
   select_stmt->order_by_.swap(order_by_expressions);
   select_stmt->is_vector_scanner_ = is_vector_scanner;
-  stmt                            = select_stmt;
+  select_stmt->view_map_.swap(view_map);
+  stmt = select_stmt;
   return RC::SUCCESS;
 }
 RC SelectStmt::create(BinderContext &binder_context, SelectSqlNode &select_sql, Stmt *&stmt)

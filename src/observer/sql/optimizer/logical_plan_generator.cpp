@@ -106,6 +106,21 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   bool        once   = true;
   for (auto table : tables) {
     unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, ReadWriteMode::READ_ONLY));
+    if (table->table_meta().is_view()) [[unlikely]] {
+      unique_ptr<LogicalOperator> view_oper;
+      auto                        iter = select_stmt->view_map().find(table);
+      if (iter == select_stmt->view_map().end()) {
+        LOG_WARN("view not found");
+        return RC::NOT_EXIST;
+      }
+      RC rc = create(iter->second, view_oper);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("failed to create view logical plan. rc=%s", strrc(rc));
+        return rc;
+      }
+      table_get_oper->add_child(std::move(view_oper));
+    }
+
     if (select_stmt->is_vector_scanner() && once) {
       auto ptr = dynamic_cast<TableGetLogicalOperator *>(table_get_oper.get());
       ptr->set_vector_scanner(true);
@@ -224,6 +239,55 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
 RC LogicalPlanGenerator::create_plan(InsertStmt *insert_stmt, unique_ptr<LogicalOperator> &logical_operator)
 {
   Table *table = insert_stmt->table();
+
+  if (table->table_meta().is_view()) {
+    Stmt *select_stmt = nullptr;
+    RC    rc          = SelectStmt::create_select_from_str(table, select_stmt);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to create select stmt from view. rc=%s", strrc(rc));
+      return rc;
+    }
+    SelectStmt *select_stmt_cast = static_cast<SelectStmt *>(select_stmt);
+
+    const auto                     &tables = select_stmt_cast->tables();
+    auto                           &values = insert_stmt->values();
+    std::vector<std::vector<Value>> new_values(select_stmt_cast->tables().size());
+    for (int i = 0; i < tables.size(); i++) {
+      auto  table_meta = tables[i]->table_meta();
+      Value v;
+      v.set_null();
+      new_values[i].resize(table_meta.field_num() - table_meta.sys_field_num(), v);
+    }
+
+    for (int i = 0; i < values.size(); i++) {
+      auto &value = values[i];
+      auto &expr  = select_stmt_cast->query_expressions()[i];
+      if (expr->type() == ExprType::FIELD) {
+        auto field_expr = dynamic_cast<FieldExpr *>(expr.get());
+        auto table_name = field_expr->table_name();
+        auto field_name = field_expr->field_name();
+        for (int j = 0; j < tables.size(); j++) {
+          if (tables[j]->name() == table_name) {
+            auto field_meta                       = tables[j]->table_meta().field(field_name);
+            new_values[j][field_meta->field_id()] = value;
+            break;
+          }
+        }
+      }
+    }
+    InsertLogicalOperator *last_insert_operator;
+    for (int i = 0; i < tables.size(); i++) {
+      InsertLogicalOperator *insert_operator = new InsertLogicalOperator(tables[i], new_values[i]);
+      if (i == 0) {
+        last_insert_operator = insert_operator;
+      } else {
+        last_insert_operator->add_child(std::unique_ptr<LogicalOperator>(insert_operator));
+        last_insert_operator = insert_operator;
+      }
+    }
+    logical_operator.reset(last_insert_operator);
+    return RC::SUCCESS;
+  }
 
   InsertLogicalOperator *insert_operator = new InsertLogicalOperator(table, insert_stmt->values());
   logical_operator.reset(insert_operator);

@@ -25,6 +25,14 @@ InsertPhysicalOperator::InsertPhysicalOperator(Table *table, vector<Value> &&val
 
 RC InsertPhysicalOperator::open(Trx *trx)
 {
+  if (!children_.empty()) {
+    RC rc = children_[0]->open(trx);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to open child operator. rc=%s", strrc(rc));
+      return rc;
+    }
+  }
+
   Record record;
   RC     rc = table_->make_record(static_cast<int>(values_.size()), values_.data(), record);
   if (rc != RC::SUCCESS) {

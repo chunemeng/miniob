@@ -25,6 +25,7 @@ static const Json::StaticString FIELD_TABLE_NAME("table_name");
 static const Json::StaticString FIELD_STORAGE_FORMAT("storage_format");
 static const Json::StaticString FIELD_FIELDS("fields");
 static const Json::StaticString FIELD_INDEXES("indexes");
+static const Json::StaticString FIELD_IS_VIEW("view");
 
 TableMeta::TableMeta(const TableMeta &other)
     : table_id_(other.table_id_),
@@ -44,7 +45,7 @@ void TableMeta::swap(TableMeta &other) noexcept
 }
 
 RC TableMeta::init(int32_t table_id, const char *name, const std::vector<FieldMeta> *trx_fields,
-    span<const AttrInfoSqlNode> attributes, StorageFormat storage_format)
+    span<const AttrInfoSqlNode> attributes, StorageFormat storage_format, bool is_view)
 {
   if (common::is_blank(name)) {
     LOG_ERROR("Name cannot be empty");
@@ -60,6 +61,7 @@ RC TableMeta::init(int32_t table_id, const char *name, const std::vector<FieldMe
 
   int field_offset  = 0;
   int trx_field_num = 0;
+  is_view_          = is_view;
 
   if (trx_fields != nullptr) {
     trx_fields_ = *trx_fields;
@@ -108,12 +110,16 @@ RC TableMeta::init(int32_t table_id, const char *name, const std::vector<FieldMe
       LOG_INFO("tlength=%d, pages_nums=%d  %d", length, pages_nums , (length << 3) + pages_nums);
       length = (length << 3) + pages_nums;
     }
+    bool visible = true;
+    if (is_view && i + 1 == attributes.size()) [[unlikely]] {
+      visible = false;
+    }
 
     rc = fields_[i + trx_field_num].init(attr_info.name.c_str(),
         attr_info.type,
         field_offset,
         length,
-        true /*visible*/,
+        visible /*visible*/,
         static_cast<int>(i),
         attr_info.nullable);
     if (OB_FAIL(rc)) {
@@ -171,7 +177,7 @@ const FieldMeta *TableMeta::find_field_by_offset(int offset) const
   }
   return nullptr;
 }
-int TableMeta::field_num() const { return fields_.size(); }
+int TableMeta::field_num() const { return fields_.size() - is_view_; }
 
 int TableMeta::sys_field_num() const { return static_cast<int>(trx_fields_.size() + null_field_num()); }
 
@@ -213,6 +219,7 @@ int TableMeta::serialize(std::ostream &ss) const
   table_value[FIELD_TABLE_ID]       = table_id_;
   table_value[FIELD_TABLE_NAME]     = name_;
   table_value[FIELD_STORAGE_FORMAT] = static_cast<int>(storage_format_);
+  table_value[FIELD_IS_VIEW]        = is_view_;
 
   Json::Value fields_value;
   for (const FieldMeta &field : fields_) {
@@ -259,6 +266,13 @@ int TableMeta::deserialize(std::istream &is)
     LOG_ERROR("Invalid table id. json value=%s", table_id_value.toStyledString().c_str());
     return -1;
   }
+
+  const Json::Value &is_view = table_value[FIELD_IS_VIEW];
+  if (!is_view.isBool()) {
+    LOG_ERROR("Invalid table meta. is_view is not bool, json value=%s", is_view.toStyledString().c_str());
+    return -1;
+  }
+  is_view_ = is_view.asBool();
 
   int32_t table_id = table_id_value.asInt();
 
@@ -309,7 +323,7 @@ int TableMeta::deserialize(std::istream &is)
   record_size_ = fields_.back().offset() + fields_.back().len() - fields_.begin()->offset();
 
   for (const FieldMeta &field_meta : fields_) {
-    if (!field_meta.visible() && field_meta.name() != "__null") {
+    if (!field_meta.visible() && (field_meta.name() == "__trx_xid_begin" || field_meta.name() == "__trx_xid_end")) {
       trx_fields_.push_back(field_meta);  // 字段加上trx标识更好
     }
   }

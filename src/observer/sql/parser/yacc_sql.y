@@ -146,6 +146,7 @@ UnboundAggregateExpr *create_aggregate_expression(AggrType aggregate_name,
         DELETE
         UPDATE
         LBRACE
+        VIEW
         RBRACE
         COMMA
         TRX_BEGIN
@@ -281,8 +282,10 @@ UnboundAggregateExpr *create_aggregate_expression(AggrType aggregate_name,
 %type <sql_node>            desc_table_stmt
 %type <sql_node>            create_index_stmt
 %type <sql_node>            drop_index_stmt
+%type <sql_node>            view_select_stmt
 %type <sql_node>            sync_stmt
 %type <sql_node>            begin_stmt
+%type <sql_node>            create_view_stmt
 %type <sql_node>            commit_stmt
 %type <sql_node>            rollback_stmt
 %type <sql_node>            load_data_stmt
@@ -319,6 +322,7 @@ command_wrapper:
   | create_index_stmt
   | drop_index_stmt
   | sync_stmt
+  | create_view_stmt
   | begin_stmt
   | commit_stmt
   | rollback_stmt
@@ -446,7 +450,24 @@ vec_index_param:
     }
     ;
 
+view_select_stmt:
+    AS select_stmt {
+          delete $2;
+          $$ = new ParsedSqlNode(SCF_CREATE_VIEW);
+          $$->create_view.select_stmt = std::move(token_name(sql_string, &@$));
+    }
+    ;
 
+create_view_stmt:
+    CREATE VIEW ID view_select_stmt storage_format{
+        $$ = $4;
+        $$->create_view.relation_name = $3;
+        if ($5 != nullptr) {
+          $$->create_view.storage_format = $5;
+          free($5);
+        }
+        free($3);
+    };
 
 create_index_stmt:    /*create index 语句的语法解析树*/
     CREATE VECTOR_T INDEX ID ON ID LBRACE rel_list RBRACE WITH LBRACE vec_index_list RBRACE
@@ -505,6 +526,7 @@ as_select_opt:
 create_table_stmt:    /*create table 语句的语法解析树*/
     CREATE TABLE ID LBRACE attr_def attr_def_list RBRACE as_select_opt storage_format
     {
+        LOG_INFO("%s",token_name(sql_string, &@$).c_str());
       auto node = new ParsedSqlNode(SCF_CREATE_TABLE);
       CreateTableSqlNode &create_table = node->create_table;
       create_table.relation_name = $3;
