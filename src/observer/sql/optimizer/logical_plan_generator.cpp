@@ -276,6 +276,9 @@ RC LogicalPlanGenerator::create_plan(InsertStmt *insert_stmt, unique_ptr<Logical
             break;
           }
         }
+      } else {
+        LOG_WARN("insert value must be field");
+        return RC::INVALID_ARGUMENT;
       }
     }
     InsertLogicalOperator *last_insert_operator;
