@@ -332,11 +332,6 @@ RC Table::update_record(Record &record, const FieldMeta *field_meta, Value &valu
 
   // TODO: optimize this
   if (value.attr_type() == AttrType::NULLS) {
-    if (!field->nullable()) {
-      LOG_WARN("insert null into not nullable field. table name:%s,field name:%s,value:%s ",
-            table_meta_.name(), field->name().c_str(), value.to_string().c_str());
-      rc = RC::INVALID_ARGUMENT;
-    }
     null_map[0] |= (1 << (field->field_id()));
   } else {
     if (field->type() != value.attr_type()) {
@@ -444,12 +439,6 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
 
     // TODO: optimize this
     if (value.attr_type() == AttrType::NULLS) {
-      if (!field->nullable()) {
-        LOG_WARN("insert null into not nullable field. table name:%s,field name:%s,value:%s ",
-            table_meta_.name(), field->name().c_str(), value.to_string().c_str());
-        rc = RC::INVALID_ARGUMENT;
-        break;
-      }
       ASSERT(value_num <= 32, "can't support more than 32 fields");
       null_map[0] |= (1 << i);
       if (field->type() == AttrType::TEXTS) {
@@ -854,11 +843,6 @@ RC Table::update_record(Record &record, vector<const FieldMeta *> &field_meta, v
 
     // TODO: optimize this
     if (value.attr_type() == AttrType::NULLS) {
-      if (!field->nullable()) {
-        LOG_WARN("insert null into not nullable field. table name:%s,field name:%s,value:%s ",
-            table_meta_.name(), field->name().c_str(), value.to_string().c_str());
-        rc = RC::INVALID_ARGUMENT;
-      }
       null_map[0] |= (1 << (field->field_id()));
     } else {
       if (field->type() != value.attr_type()) {
@@ -915,11 +899,6 @@ RC Table::make_record(
     LOG_INFO("field name:%s, value:%s", field->name().c_str(), value.to_string().c_str());
     // TODO: optimize this
     if (value.attr_type() == AttrType::NULLS) {
-      if (!field->nullable()) {
-        LOG_WARN("insert null into not nullable field. table name:%s,field name:%s,value:%s ",
-            table_meta_.name(), field->name().c_str(), value.to_string().c_str());
-        rc = RC::INVALID_ARGUMENT;
-      }
       null_map[0] |= (1 << (field->field_id()));
       if (field->type() == AttrType::TEXTS) {
         auto bp  = reinterpret_cast<int *>(data + field->offset());
