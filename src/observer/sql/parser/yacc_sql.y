@@ -971,29 +971,35 @@ as_opt:
     ;
 
 expression:
-    rel_attr as_opt {
-      RelAttrSqlNode *node = $1;
-      UnboundFieldExpr * ex = new UnboundFieldExpr(node->relation_name, node->attribute_name);
+    rel_attr  {
+                RelAttrSqlNode *node = $1;
+                UnboundFieldExpr * ex = new UnboundFieldExpr(node->relation_name, node->attribute_name);
 
 
-      if ($2 != nullptr) {
-        ex->set_name($2);
-        ex->set_alias(true);
-        free($2);
-      } else {
-        ex->set_name(token_name(sql_string, &@$));
-      }
 
-      $$ = ex;
-      delete $1;
-    }
+                ex->set_name(token_name(sql_string, &@$));
+
+
+                $$ = ex;
+                delete $1;
+              }
+
     | expression ID {
             $$ = $1;
+             if ($$->type() == ExprType::UNBOUND_FIELD)    {
+                auto ex = dynamic_cast<UnboundFieldExpr*>($$);
+                 ex->set_alias(true);
+             }
             $$->set_name($2);
             free($2);
     }
    | expression AS ID {
             $$ = $1;
+            if ($$->type() == ExprType::UNBOUND_FIELD)    {
+                            auto ex = dynamic_cast<UnboundFieldExpr*>($$);
+
+                             ex->set_alias(true);
+            }
             $$->set_name($3);
             free($3);
     }
@@ -1083,6 +1089,7 @@ expression:
       $$ = create_aggregate_expression(AggrType::MIN, std::move(*$3), sql_string, &@$);
       delete $3;
     }
+
 
     // your code here
     ;
