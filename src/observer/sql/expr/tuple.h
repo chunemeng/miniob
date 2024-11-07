@@ -267,7 +267,7 @@ public:
   RC spec_at(int index, TupleCellSpec &spec) const override
   {
     const Field &field = speces_[index]->field();
-    spec               = TupleCellSpec(table_->name(), field.field_name());
+    spec               = TupleCellSpec(table_->name(), field.field_name(), speces_[index]->name());
     return RC::SUCCESS;
   }
 

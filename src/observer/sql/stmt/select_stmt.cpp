@@ -96,7 +96,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     binder_context.add_alias_ordered(std::move(table_name.attribute_name));
   }
 
-  bool should_alis = select_sql.relations.size() > 0 || !select_sql.inner_joins.empty();
+  bool should_alis = select_sql.relations.size() > 1 || !select_sql.inner_joins.empty();
 
   std::vector<std::unique_ptr<Expression>> conditions;
 

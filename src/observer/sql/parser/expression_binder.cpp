@@ -150,6 +150,9 @@ RC ExpressionBinder::bind_star_expression(
     for (int i = 0; i < all_tables.size(); i++) {
       Table      *table = all_tables[i];
       std::string alias = context_.alias().size() > i ? context_.alias()[i] : "";
+      if (alias.empty()) {
+        alias = table->table_meta().name_str();
+      }
       wildcard_fields(table, bound_expressions, should_alis, alias);
     }
   }
