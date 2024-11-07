@@ -339,14 +339,16 @@ RC SelectStmt::create(BinderContext &binder_context, SelectSqlNode &select_sql, 
   }
 
   // everything alright
-  SelectStmt *select_stmt = new SelectStmt();
-
+  SelectStmt              *select_stmt = new SelectStmt();
+  std::vector<std::string> alis_names;
+  alis_names.resize(binder_context.table_ordered().size(), {});
   select_stmt->tables_.swap(binder_context.table_ordered());
   select_stmt->query_expressions_.swap(bound_expressions);
   select_stmt->filter_stmt_ = filter_stmt;
   select_stmt->having_stmt_ = having_stmt;
   select_stmt->group_by_.swap(group_by_expressions);
   select_stmt->order_by_.swap(order_by_expressions);
+  select_stmt->alis_names_.swap(alis_names);
   stmt = select_stmt;
   return RC::SUCCESS;
 }

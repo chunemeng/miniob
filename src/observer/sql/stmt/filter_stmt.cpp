@@ -44,7 +44,7 @@ RC FilterStmt::create(ExpressionBinder &binder, Expression *expr, FilterStmt *&s
   rc = binder.bind_expression(filter_unit, units, false, true);
   if (rc != RC::SUCCESS) {
     delete tmp_stmt;
-    LOG_WARN("failed to create filter unit. condition index=%d");
+    LOG_WARN("failed to create filter unit. condition index=%d", 0);
     return rc;
   }
   if (units.empty()) {

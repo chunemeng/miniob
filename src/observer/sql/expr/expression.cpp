@@ -23,7 +23,8 @@ using namespace std;
 
 RC FieldExpr::get_value(const Tuple &tuple, Value &value) const
 {
-  return tuple.find_cell({table_name(), field_name(), alias_.c_str()}, value, true);
+  std::string alias = alias_.empty() ? table_name() : alias_;
+  return tuple.find_cell({table_name(), field_name(), alias.c_str()}, value, true);
 }
 
 bool FieldExpr::equal(const Expression &other) const
