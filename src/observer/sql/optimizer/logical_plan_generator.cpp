@@ -107,8 +107,9 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   auto       &alias_tables = select_stmt->alis_names();
   for (int i = 0; i < tables.size(); ++i) {
     auto                        table = tables[i];
+    std::string                 alias = alias_tables.size() > i ? alias_tables[i] : "";
     unique_ptr<LogicalOperator> table_get_oper(
-        new TableGetLogicalOperator(table, ReadWriteMode::READ_ONLY, std::move(alias_tables[i])));
+        new TableGetLogicalOperator(table, ReadWriteMode::READ_ONLY, std::move(alias)));
     if (table->table_meta().is_view()) [[unlikely]] {
       unique_ptr<LogicalOperator> view_oper;
       auto                        iter = select_stmt->view_map().find(table);
