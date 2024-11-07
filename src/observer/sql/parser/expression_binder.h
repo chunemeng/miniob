@@ -60,6 +60,8 @@ public:
     alias_back_map_.emplace(table_name, alias);
   }
 
+  void add_alias_ordered(std::string &&alias) { alias_.emplace_back(std::move(alias)); }
+
   void add_same_alias(const std::string &alias, const std::string &table_name)
   {
     alias_map_.emplace(alias, table_name);
@@ -95,6 +97,7 @@ public:
   std::unordered_map<std::string, Table *> &table_map() { return table_map_; }
   std::vector<Table *>                     &table_ordered() { return table_ordered_; }
   Db                                       *get_db() const { return db_; }
+  std::vector<std::string>                 &alias() { return alias_; }
 
 private:
   Db                                          *db_ = nullptr;
@@ -104,7 +107,8 @@ private:
   // NOTE: TO PRINT
   std::unordered_map<std::string, std::string> alias_back_map_;  // use for alias
   // use for output the table in order
-  std::vector<Table *> table_ordered_;
+  std::vector<Table *>     table_ordered_;
+  std::vector<std::string> alias_;
 };
 
 /**
@@ -118,7 +122,7 @@ public:
   virtual ~ExpressionBinder() = default;
 
   RC bind_expression(std::unique_ptr<Expression> &expr, std::vector<std::unique_ptr<Expression>> &bound_expressions,
-      bool should_alis = false);
+      bool should_alis = false, bool should_dis = false);
 
 private:
   RC bind_subquery_expression(
@@ -129,7 +133,7 @@ private:
   RC bind_vec_order_by_expression(std::unique_ptr<Expression> &unbound_star_expr,
       std::vector<std::unique_ptr<Expression>> &bound_expressions, bool should_alis = false);
   RC bind_unbound_field_expression(std::unique_ptr<Expression> &unbound_field_expr,
-      std::vector<std::unique_ptr<Expression>> &bound_expressions, bool should_alis = false);
+      std::vector<std::unique_ptr<Expression>> &bound_expressions, bool should_alis = false, bool should_dis = false);
   RC bind_order_by_expression(
       std::unique_ptr<Expression> &order_by_expr, std::vector<std::unique_ptr<Expression>> &bound_expressions);
   RC bind_field_expression(
@@ -140,12 +144,12 @@ private:
       std::unique_ptr<Expression> &value_expr, std::vector<std::unique_ptr<Expression>> &bound_expressions);
   RC bind_cast_expression(
       std::unique_ptr<Expression> &cast_expr, std::vector<std::unique_ptr<Expression>> &bound_expressions);
-  RC bind_comparison_expression(
-      std::unique_ptr<Expression> &comparison_expr, std::vector<std::unique_ptr<Expression>> &bound_expressions);
-  RC bind_conjunction_expression(
-      std::unique_ptr<Expression> &conjunction_expr, std::vector<std::unique_ptr<Expression>> &bound_expressions);
-  RC bind_arithmetic_expression(
-      std::unique_ptr<Expression> &arithmetic_expr, std::vector<std::unique_ptr<Expression>> &bound_expressions);
+  RC bind_comparison_expression(std::unique_ptr<Expression> &comparison_expr,
+      std::vector<std::unique_ptr<Expression>> &bound_expressions, bool should_dis = false);
+  RC bind_conjunction_expression(std::unique_ptr<Expression> &conjunction_expr,
+      std::vector<std::unique_ptr<Expression>> &bound_expressions, bool should_dis = false);
+  RC bind_arithmetic_expression(std::unique_ptr<Expression> &arithmetic_expr,
+      std::vector<std::unique_ptr<Expression>> &bound_expressions, bool should_dis = false);
   RC bind_aggregate_expression(
       std::unique_ptr<Expression> &aggregate_expr, std::vector<std::unique_ptr<Expression>> &bound_expressions);
 

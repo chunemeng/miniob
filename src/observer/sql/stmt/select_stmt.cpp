@@ -48,7 +48,7 @@ RC SelectStmt::create_select_from_str(Table *table, Stmt *&stmt)
   }
 
   SelectSqlNode select = std::move(sql_node.sql_nodes()[0]->selection);
-  rc     = SelectStmt::create(table->db(), select, stmt);
+  rc                   = SelectStmt::create(table->db(), select, stmt);
   return rc;
 }
 
@@ -65,7 +65,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
 
   // collect tables in `from` statement
   for (size_t i = 0; i < select_sql.relations.size(); i++) {
-    const auto &table_name = select_sql.relations[i];
+    auto &table_name = select_sql.relations[i];
     if (table_name.relation_name.empty()) {
       LOG_WARN("invalid argument. relation name is null. index=%d", i);
       return RC::INVALID_ARGUMENT;
@@ -93,8 +93,10 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
       LOG_WARN("alias name already exists. alias=%s, table_name=%s", table_name.attribute_name.c_str(), table_name.relation_name.c_str());
       return RC::SCHEMA_ALIAS_NAME_REPEAT;
     }
+    binder_context.add_alias_ordered(std::move(table_name.attribute_name));
   }
-  bool should_alis = !select_sql.inner_joins.empty();
+
+  bool should_alis = select_sql.relations.size() > 0 || !select_sql.inner_joins.empty();
 
   std::vector<std::unique_ptr<Expression>> conditions;
 
@@ -214,6 +216,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   select_stmt->order_by_.swap(order_by_expressions);
   select_stmt->is_vector_scanner_ = is_vector_scanner;
   select_stmt->view_map_.swap(view_map);
+  select_stmt->alis_names_.swap(binder_context.alias());
   stmt = select_stmt;
   return RC::SUCCESS;
 }

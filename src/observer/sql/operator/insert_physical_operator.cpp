@@ -25,6 +25,9 @@ InsertPhysicalOperator::InsertPhysicalOperator(Table *table, vector<Value> &&val
 
 RC InsertPhysicalOperator::open(Trx *trx)
 {
+  if (table_ == nullptr) {
+    return RC::SUCCESS;
+  }
   if (!children_.empty()) {
     RC rc = children_[0]->open(trx);
     if (rc != RC::SUCCESS) {

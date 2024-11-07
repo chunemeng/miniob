@@ -37,7 +37,7 @@ RC NestedLoopJoinPhysicalOperator::open(Trx *trx)
 
 RC NestedLoopJoinPhysicalOperator::next()
 {
-  RC   rc             = RC::SUCCESS;
+  RC rc = RC::SUCCESS;
   do {
     if (round_done_) {
       rc = left_next();
@@ -136,7 +136,6 @@ RC NestedLoopJoinPhysicalOperator::filter(bool &result)
   RC    rc = RC::SUCCESS;
   Value value;
   for (unique_ptr<Expression> &expr : join_condition_) {
-    LOG_INFO("filter exps");
     rc = expr->get_value(joined_tuple_, value);
     if (rc != RC::SUCCESS) {
       return rc;

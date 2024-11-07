@@ -48,12 +48,13 @@ static void wildcard_fields(
     } else {
       field_expr->set_name(field.field_name());
     }
+    field_expr->set_alias(table_name);
     expressions.emplace_back(field_expr);
   }
 }
 
 RC ExpressionBinder::bind_expression(
-    unique_ptr<Expression> &expr, vector<unique_ptr<Expression>> &bound_expressions, bool should_alis)
+    unique_ptr<Expression> &expr, vector<unique_ptr<Expression>> &bound_expressions, bool should_alis, bool should_dis)
 {
   if (nullptr == expr) {
     return RC::SUCCESS;
@@ -65,7 +66,7 @@ RC ExpressionBinder::bind_expression(
     } break;
 
     case ExprType::UNBOUND_FIELD: {
-      return bind_unbound_field_expression(expr, bound_expressions, should_alis);
+      return bind_unbound_field_expression(expr, bound_expressions, should_alis, should_dis);
     } break;
 
     case ExprType::UNBOUND_AGGREGATION: {
@@ -91,15 +92,15 @@ RC ExpressionBinder::bind_expression(
     } break;
 
     case ExprType::COMPARISON: {
-      return bind_comparison_expression(expr, bound_expressions);
+      return bind_comparison_expression(expr, bound_expressions, should_dis);
     } break;
 
     case ExprType::CONJUNCTION: {
-      return bind_conjunction_expression(expr, bound_expressions);
+      return bind_conjunction_expression(expr, bound_expressions, should_dis);
     } break;
 
     case ExprType::ARITHMETIC: {
-      return bind_arithmetic_expression(expr, bound_expressions);
+      return bind_arithmetic_expression(expr, bound_expressions, should_dis);
     } break;
 
     case ExprType::AGGREGATION: {
@@ -146,8 +147,9 @@ RC ExpressionBinder::bind_star_expression(
   } else {
     auto &all_tables = context_.table_ordered();
     LOG_INFO("all tables size %d", all_tables.size());
-    for (auto table : all_tables) {
-      std::string alias = context_.get_alias_back(table->table_meta().name_str());
+    for (int i = 0; i < all_tables.size(); i++) {
+      Table      *table = all_tables[i];
+      std::string alias = context_.alias()[i];
       LOG_INFO("table name %s", table->table_meta().name_str().c_str());
       wildcard_fields(table, bound_expressions, should_alis, alias);
     }
@@ -157,7 +159,7 @@ RC ExpressionBinder::bind_star_expression(
 }
 
 RC ExpressionBinder::bind_unbound_field_expression(
-    unique_ptr<Expression> &expr, vector<unique_ptr<Expression>> &bound_expressions, bool should_alis)
+    unique_ptr<Expression> &expr, vector<unique_ptr<Expression>> &bound_expressions, bool should_alis, bool should_dis)
 {
   if (nullptr == expr) {
     return RC::SUCCESS;
@@ -192,6 +194,7 @@ RC ExpressionBinder::bind_unbound_field_expression(
         return RC::SCHEMA_TABLE_NOT_EXIST;
       }
       context_.add_table(table);
+      context_.add_alias_ordered({});
     }
   }
 
@@ -208,6 +211,7 @@ RC ExpressionBinder::bind_unbound_field_expression(
     Field      field(table, field_meta);
     FieldExpr *field_expr = new FieldExpr(field);
 
+    field_expr->set_alias(alias);
     if (unbound_field_expr->is_alias()) {
       field_expr->set_name(unbound_field_expr->name());
     } else if (should_alis) {
@@ -281,7 +285,7 @@ static int implicit_cast_cost(AttrType from, AttrType to)
 }
 
 RC ExpressionBinder::bind_comparison_expression(
-    unique_ptr<Expression> &expr, vector<unique_ptr<Expression>> &bound_expressions)
+    unique_ptr<Expression> &expr, vector<unique_ptr<Expression>> &bound_expressions, bool should_dis)
 {
   if (nullptr == expr) {
     return RC::SUCCESS;
@@ -293,7 +297,7 @@ RC ExpressionBinder::bind_comparison_expression(
   unique_ptr<Expression>        &left_expr  = comparison_expr->left();
   unique_ptr<Expression>        &right_expr = comparison_expr->right();
 
-  RC rc = bind_expression(left_expr, child_bound_expressions);
+  RC rc = bind_expression(left_expr, child_bound_expressions, false, should_dis);
   if (rc != RC::SUCCESS) {
     return rc;
   }
@@ -318,7 +322,7 @@ RC ExpressionBinder::bind_comparison_expression(
     return RC::SUCCESS;
   }
 
-  rc = bind_expression(right_expr, child_bound_expressions);
+  rc = bind_expression(right_expr, child_bound_expressions, false, should_dis);
   if (rc != RC::SUCCESS) {
     return rc;
   }
@@ -391,7 +395,7 @@ RC ExpressionBinder::bind_comparison_expression(
 }
 
 RC ExpressionBinder::bind_conjunction_expression(
-    unique_ptr<Expression> &expr, vector<unique_ptr<Expression>> &bound_expressions)
+    unique_ptr<Expression> &expr, vector<unique_ptr<Expression>> &bound_expressions, bool should_dis)
 {
   if (nullptr == expr) {
     return RC::SUCCESS;
@@ -405,7 +409,7 @@ RC ExpressionBinder::bind_conjunction_expression(
   for (unique_ptr<Expression> &child_expr : children) {
     child_bound_expressions.clear();
 
-    RC rc = bind_expression(child_expr, child_bound_expressions);
+    RC rc = bind_expression(child_expr, child_bound_expressions, false, should_dis);
     if (rc != RC::SUCCESS) {
       return rc;
     }
@@ -427,7 +431,7 @@ RC ExpressionBinder::bind_conjunction_expression(
 }
 
 RC ExpressionBinder::bind_arithmetic_expression(
-    unique_ptr<Expression> &expr, vector<unique_ptr<Expression>> &bound_expressions)
+    unique_ptr<Expression> &expr, vector<unique_ptr<Expression>> &bound_expressions, bool should_dis)
 {
   if (nullptr == expr) {
     return RC::SUCCESS;
@@ -439,7 +443,7 @@ RC ExpressionBinder::bind_arithmetic_expression(
   unique_ptr<Expression>        &left_expr  = arithmetic_expr->left();
   unique_ptr<Expression>        &right_expr = arithmetic_expr->right();
 
-  RC rc = bind_expression(left_expr, child_bound_expressions);
+  RC rc = bind_expression(left_expr, child_bound_expressions, false, should_dis);
   if (OB_FAIL(rc)) {
     return rc;
   }
@@ -457,7 +461,7 @@ RC ExpressionBinder::bind_arithmetic_expression(
   child_bound_expressions.clear();
 
   if (right_expr) {
-    rc = bind_expression(right_expr, child_bound_expressions);
+    rc = bind_expression(right_expr, child_bound_expressions, false, should_dis);
     if (OB_FAIL(rc)) {
       return rc;
     }

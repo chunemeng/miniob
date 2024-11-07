@@ -41,7 +41,7 @@ RC FilterStmt::create(ExpressionBinder &binder, Expression *expr, FilterStmt *&s
   }
 
   std::vector<std::unique_ptr<Expression>> units;
-  rc = binder.bind_expression(filter_unit, units);
+  rc = binder.bind_expression(filter_unit, units, false, true);
   if (rc != RC::SUCCESS) {
     delete tmp_stmt;
     LOG_WARN("failed to create filter unit. condition index=%d");

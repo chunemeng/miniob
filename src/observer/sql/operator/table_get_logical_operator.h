@@ -25,7 +25,7 @@ See the Mulan PSL v2 for more details. */
 class TableGetLogicalOperator : public LogicalOperator
 {
 public:
-  TableGetLogicalOperator(Table *table, ReadWriteMode mode);
+  TableGetLogicalOperator(Table *table, ReadWriteMode mode, std::string&& alias);
   virtual ~TableGetLogicalOperator() = default;
 
   LogicalOperatorType type() const override { return LogicalOperatorType::TABLE_GET; }
@@ -37,14 +37,16 @@ public:
   bool is_vector_scanner() const { return is_vector_scanner_; }
   void set_vector_scanner(bool is_vector_scanner) { is_vector_scanner_ = is_vector_scanner; }
 
-  void set_vector_scan_expr(std::unique_ptr<Expression> &&expr) { vector_scan_expr_ = std::move(expr); }
-  auto vector_scan_expr() -> std::unique_ptr<Expression> & { return vector_scan_expr_; }
-  auto predicates() -> std::vector<std::unique_ptr<Expression>> & { return predicates_; }
+  void         set_vector_scan_expr(std::unique_ptr<Expression> &&expr) { vector_scan_expr_ = std::move(expr); }
+  auto         vector_scan_expr() -> std::unique_ptr<Expression>         &{ return vector_scan_expr_; }
+  auto         predicates() -> std::vector<std::unique_ptr<Expression>>         &{ return predicates_; }
+  std::string &alias() { return alias_; }
 
 private:
   Table        *table_             = nullptr;
   ReadWriteMode mode_              = ReadWriteMode::READ_WRITE;
   bool          is_vector_scanner_ = false;
+  std::string   alias_;
 
   std::unique_ptr<Expression> vector_scan_expr_;
 

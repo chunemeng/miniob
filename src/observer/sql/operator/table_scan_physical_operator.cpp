@@ -23,13 +23,17 @@ RC TableScanPhysicalOperator::open(Trx *trx)
 {
   RC rc        = RC::SUCCESS;
   record_size_ = table_->table_meta().record_size() - table_->table_meta().view_select_len();
+  if (alias_.empty()) {
+    alias_ = table_->name();
+  }
+
   if (is_view_) {
     rc                 = children_[0]->open(trx);
     auto field_metas_p = table_->table_meta().field_metas();
-    v_tuple_.set_schema(table_, {field_metas_p->data() + 1, field_metas_p->size() - 2});
+    v_tuple_.set_schema(table_, {field_metas_p->data() + 1, field_metas_p->size() - 2}, alias_);
   } else {
     rc = table_->get_record_scanner(record_scanner_, trx, mode_);
-    tuple_.set_schema(table_, table_->table_meta().field_metas());
+    tuple_.set_schema(table_, table_->table_meta().field_metas(), alias_);
   }
 
   trx_ = trx;

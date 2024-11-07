@@ -23,7 +23,7 @@ using namespace std;
 
 RC FieldExpr::get_value(const Tuple &tuple, Value &value) const
 {
-  return tuple.find_cell(TupleCellSpec(table_name(), field_name()), value);
+  return tuple.find_cell({table_name(), field_name(), alias_.c_str()}, value, true);
 }
 
 bool FieldExpr::equal(const Expression &other) const
@@ -706,7 +706,7 @@ unique_ptr<Aggregator> AggregateExpr::create_aggregator() const
 
 RC AggregateExpr::get_value(const Tuple &tuple, Value &value) const
 {
-  return tuple.find_cell(TupleCellSpec(name()), value);
+  return tuple.find_cell(TupleCellSpec(name()), value, false);
 }
 
 RC SubQueryExpr::create_select(BinderContext &binder_context, bool should_one)

@@ -102,10 +102,13 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   unique_ptr<LogicalOperator>  table_oper(nullptr);
   unique_ptr<LogicalOperator> *last_oper = &table_oper;
 
-  const auto &tables = select_stmt->tables();
-  bool        once   = true;
-  for (auto table : tables) {
-    unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, ReadWriteMode::READ_ONLY));
+  const auto &tables       = select_stmt->tables();
+  bool        once         = true;
+  auto       &alias_tables = select_stmt->alis_names();
+  for (int i = 0; i < tables.size(); ++i) {
+    auto                        table = tables[i];
+    unique_ptr<LogicalOperator> table_get_oper(
+        new TableGetLogicalOperator(table, ReadWriteMode::READ_ONLY, std::move(alias_tables[i])));
     if (table->table_meta().is_view()) [[unlikely]] {
       unique_ptr<LogicalOperator> view_oper;
       auto                        iter = select_stmt->view_map().find(table);
@@ -278,7 +281,7 @@ RC LogicalPlanGenerator::create_plan(InsertStmt *insert_stmt, unique_ptr<Logical
     }
     SelectStmt *select_stmt_cast = static_cast<SelectStmt *>(select_stmt);
 
-    const auto                     &tables = select_stmt_cast->tables();
+    auto                           &tables = select_stmt_cast->tables();
     std::vector<std::vector<Value>> new_values(select_stmt_cast->tables().size());
     for (int i = 0; i < tables.size(); i++) {
       auto  table_meta = tables[i]->table_meta();
@@ -309,7 +312,97 @@ RC LogicalPlanGenerator::create_plan(InsertStmt *insert_stmt, unique_ptr<Logical
         return RC::INVALID_ARGUMENT;
       }
     }
+
     InsertLogicalOperator *last_insert_operator;
+
+    //    if (filter != nullptr && filter->type() == ExprType::COMPARISON) [[unlikely]] {
+    //      auto comp = dynamic_cast<ComparisonExpr *>(filter.get());
+    //      if (comp->left()->type() == ExprType::FIELD) {
+    //        if (comp->right()->type() == ExprType::VALUE) {
+    //          Value left;
+    //          Value right;
+    //          for (int j = 0; j < tables.size(); j++) {
+    //            auto field_expr = dynamic_cast<FieldExpr *>(comp->left().get());
+    //            if (tables[j]->name() == field_expr->table_name()) {
+    //              auto field_meta = tables[j]->table_meta().field(field_expr->field_name());
+    //              if (field_meta == nullptr) {
+    //                continue;
+    //              }
+    //              left = new_values[j][field_meta->field_id()];
+    //              break;
+    //            }
+    //          }
+    //
+    //          bool v;
+    //          comp->right()->try_get_value(right);
+    //          comp->compare_value(left, right, v);
+    //          if (!v) {
+    //            tables.clear();
+    //          }
+    //        } else if (comp->right()->type() == ExprType::FIELD) {
+    //          auto  field_expr_left  = dynamic_cast<FieldExpr *>(comp->left().get());
+    //          auto  field_expr_right = dynamic_cast<FieldExpr *>(comp->right().get());
+    //          Value left;
+    //          Value right;
+    //          for (int j = 0; j < tables.size(); j++) {
+    //            if (tables[j]->name() == field_expr_left->table_name()) {
+    //              auto field_meta = tables[j]->table_meta().field(field_expr_left->field_name());
+    //              if (field_meta == nullptr) {
+    //                continue;
+    //              }
+    //              left = new_values[j][field_meta->field_id()];
+    //              break;
+    //            }
+    //          }
+    //          for (int j = 0; j < tables.size(); j++) {
+    //            if (tables[j]->name() == field_expr_right->table_name()) {
+    //              auto field_meta = tables[j]->table_meta().field(field_expr_right->field_name());
+    //              if (field_meta == nullptr) {
+    //                continue;
+    //              }
+    //              right = new_values[j][field_meta->field_id()];
+    //              break;
+    //            }
+    //          }
+    //          bool v;
+    //          comp->compare_value(left, right, v);
+    //          if (!v) {
+    //            tables.clear();
+    //          }
+    //        }
+    //      } else if (comp->left()->type() == ExprType::VALUE) {
+    //        if (comp->right()->type() == ExprType::VALUE) {
+    //          Value v;
+    //          comp->try_get_value(v);
+    //          if (!v.get_boolean()) {
+    //            tables.clear();
+    //          }
+    //        }
+    //
+    //        if (comp->right()->type() == ExprType::FIELD) {
+    //          Value left;
+    //          Value right;
+    //          for (int j = 0; j < tables.size(); j++) {
+    //            auto field_expr = dynamic_cast<FieldExpr *>(comp->right().get());
+    //            if (tables[j]->name() == field_expr->table_name()) {
+    //              auto field_meta = tables[j]->table_meta().field(field_expr->field_name());
+    //              if (field_meta == nullptr) {
+    //                continue;
+    //              }
+    //              right = new_values[j][field_meta->field_id()];
+    //              break;
+    //            }
+    //          }
+    //          bool v;
+    //          comp->left()->try_get_value(left);
+    //          comp->compare_value(left, right, v);
+    //          if (!v) {
+    //            tables.clear();
+    //          }
+    //        }
+    //      }
+    //    }
+
     for (int i = 0; i < tables.size(); i++) {
       InsertLogicalOperator *insert_operator = new InsertLogicalOperator(tables[i], new_values[i]);
       if (i == 0) {
@@ -319,6 +412,7 @@ RC LogicalPlanGenerator::create_plan(InsertStmt *insert_stmt, unique_ptr<Logical
         last_insert_operator = insert_operator;
       }
     }
+
     logical_operator.reset(last_insert_operator);
     return RC::SUCCESS;
   }
@@ -332,7 +426,7 @@ RC LogicalPlanGenerator::create_plan(DeleteStmt *delete_stmt, unique_ptr<Logical
 {
   Table                      *table       = delete_stmt->table();
   FilterStmt                 *filter_stmt = delete_stmt->filter_stmt();
-  unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, ReadWriteMode::READ_WRITE));
+  unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, ReadWriteMode::READ_WRITE, {}));
 
   unique_ptr<LogicalOperator> predicate_oper;
 
@@ -359,7 +453,7 @@ RC LogicalPlanGenerator::create_plan(UpdateStmt *update_stmt, unique_ptr<Logical
 {
   Table                      *table       = update_stmt->table();
   FilterStmt                 *filter_stmt = update_stmt->filter_stmt();
-  unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, ReadWriteMode::READ_WRITE));
+  unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, ReadWriteMode::READ_WRITE, {}));
 
   unique_ptr<LogicalOperator> predicate_oper;
 

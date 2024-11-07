@@ -37,6 +37,12 @@ public:
     return table_name_ == other.table_name_ && field_name_ == other.field_name_ && alias_ == other.alias_;
   }
 
+
+  bool equals_no_alias(const TupleCellSpec &other) const
+  {
+    return table_name_ == other.table_name_ && field_name_ == other.field_name_;
+  }
+
 private:
   std::string table_name_;
   std::string field_name_;

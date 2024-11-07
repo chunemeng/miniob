@@ -44,15 +44,16 @@ public:
   static RC create(BinderContext &binder_context, SelectSqlNode &select_sql, Stmt *&stmt);
 
 public:
-  const std::vector<Table *> &tables() const { return tables_; }
-  FilterStmt                 *filter_stmt() const { return filter_stmt_; }
-  FilterStmt                 *having_stmt() const { return having_stmt_; }
-  static RC                   create_select_from_str(Table *table, Stmt *&stmt);
+  std::vector<Table *> &tables() { return tables_; }
+  FilterStmt           *filter_stmt() const { return filter_stmt_; }
+  FilterStmt           *having_stmt() const { return having_stmt_; }
+  static RC             create_select_from_str(Table *table, Stmt *&stmt);
 
   std::vector<std::unique_ptr<Expression>>  &query_expressions() { return query_expressions_; }
   std::vector<std::unique_ptr<Expression>>  &group_by() { return group_by_; }
   std::vector<std::unique_ptr<Expression>>  &order_by() { return order_by_; }
   std::unordered_map<Table *, SelectStmt *> &view_map() { return view_map_; }
+  std::vector<std::string>                  &alis_names() { return alis_names_; }
 
   RC get_attr_infos(std::vector<AttrInfoSqlNode> &field_meta);
 
@@ -66,5 +67,6 @@ private:
   std::vector<std::unique_ptr<Expression>>  order_by_;
   std::vector<std::unique_ptr<Expression>>  group_by_;
   std::unordered_map<Table *, SelectStmt *> view_map_;
+  std::vector<std::string>                  alis_names_;
   bool                                      is_vector_scanner_ = false;
 };

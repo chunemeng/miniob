@@ -31,8 +31,8 @@ RC push_predicate_to_child(std::unordered_map<std::string, std::unique_ptr<Expre
 
   RC                            rc = RC::SUCCESS;
   std::queue<LogicalOperator *> q;
-  JoinLogicalOperator          *current = join_oper;
-  JoinLogicalOperator *child_join = nullptr;
+  JoinLogicalOperator          *current    = join_oper;
+  JoinLogicalOperator          *child_join = nullptr;
 
   int pos = -1;
   q.emplace(current->children()[0].get());
@@ -299,6 +299,9 @@ RC PredicatePushdownRewriter::get_exprs_can_pushdown(unique_ptr<Expression> &exp
     if (is_left_field && is_right_field) {
       auto left_name  = dynamic_cast<FieldExpr *>(left_expr.get())->table_name();
       auto right_name = dynamic_cast<FieldExpr *>(right_expr.get())->table_name();
+      if (left_name == right_name) {
+        return rc;
+      }
       if (left_name > right_name) {
         pushdown_join_exprs.emplace(std::make_pair(right_name, left_name), std::move(expr));
       } else {
@@ -318,7 +321,6 @@ RC PredicatePushdownRewriter::get_exprs_can_pushdown(unique_ptr<Expression> &exp
     if (left_expr->type() == ExprType::CAST || right_expr->type() == ExprType::CAST) {
       return rc;
     }
-
 
     auto name =
         (is_left_field ? dynamic_cast<FieldExpr *>(left_expr.get()) : dynamic_cast<FieldExpr *>(right_expr.get()))

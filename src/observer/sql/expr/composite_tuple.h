@@ -41,7 +41,7 @@ public:
   RC  cell_at(int index, Value &cell) const override;
   RC  find_cell_index(const TupleCellSpec &spec, int &index) const override;
   RC  spec_at(int index, TupleCellSpec &spec) const override;
-  RC  find_cell(const TupleCellSpec &spec, Value &cell) const override;
+  RC  find_cell(const TupleCellSpec &spec, Value &cell, bool should_dif) const override;
 
   void   add_tuple(std::unique_ptr<Tuple> tuple);
   Tuple &tuple_at(size_t index);

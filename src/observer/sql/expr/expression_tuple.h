@@ -64,11 +64,11 @@ public:
     return RC::NOTFOUND;
   }
 
-  RC find_cell(const TupleCellSpec &spec, Value &cell) const override
+  RC find_cell(const TupleCellSpec &spec, Value &cell, bool should_dif) const override
   {
     RC rc = RC::SUCCESS;
     if (child_tuple_ != nullptr) {
-      rc = child_tuple_->find_cell(spec, cell);
+      rc = child_tuple_->find_cell(spec, cell, false);
       if (OB_SUCC(rc)) {
         return rc;
       }

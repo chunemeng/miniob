@@ -96,7 +96,7 @@ public:
    * @param spec cell的描述
    * @param[out] cell 返回的cell
    */
-  virtual RC find_cell(const TupleCellSpec &spec, Value &cell) const = 0;
+  virtual RC find_cell(const TupleCellSpec &spec, Value &cell, bool should_dif) const = 0;
 
   virtual std::string to_string() const
   {
@@ -191,6 +191,24 @@ public:
     }
   }
 
+  void set_schema(const Table *table, const std::vector<FieldMeta> *fields, const std::string &alias)
+  {
+    table_ = table;
+    // fix:join当中会多次调用右表的open,open当中会调用set_scheme，从而导致tuple当中会存储
+    // 很多无意义的field和value，因此需要先clear掉
+    for (FieldExpr *spec : speces_) {
+      delete spec;
+    }
+    this->speces_.clear();
+    this->speces_.reserve(fields->size());
+    ASSERT(!fields->empty(), "record_ is nullptr");
+    for (int i = 0; i < static_cast<int>(fields->size()); i++) {
+      auto field_expr = new FieldExpr(table, &(*fields)[i]);
+      field_expr->set_name(alias);
+      speces_.push_back(field_expr);
+    }
+  }
+
   int cell_num() const override { return speces_.size(); }
 
   RC cell_at(int index, Value &cell) const override
@@ -270,7 +288,7 @@ public:
     return RC::NOTFOUND;
   }
 
-  RC find_cell(const TupleCellSpec &spec, Value &cell) const override
+  RC find_cell(const TupleCellSpec &spec, Value &cell, bool should_dif) const override
   {
     const auto &table_name = spec.table_name_str();
     const auto &field_name = spec.field_name();
@@ -281,7 +299,7 @@ public:
     for (size_t i = 0; i < speces_.size(); ++i) {
       const FieldExpr *field_expr = speces_[i];
       const Field     &field      = field_expr->field();
-      if (field_name == field.field_name()) {
+      if (field_name == field.field_name() && (!should_dif || spec.alias_str() == field_expr->get_name())) {
         return cell_at(static_cast<int>(i), cell);
       }
     }
@@ -357,7 +375,10 @@ public:
     return RC::SUCCESS;
   }
 
-  RC find_cell(const TupleCellSpec &spec, Value &cell) const override { return tuple_->find_cell(spec, cell); }
+  RC find_cell(const TupleCellSpec &spec, Value &cell, bool should_dif) const override
+  {
+    return tuple_->find_cell(spec, cell, false);
+  }
 
 #if 0
   RC cell_spec_at(int index, const TupleCellSpec *&spec) const override
@@ -424,14 +445,21 @@ public:
     return RC::SUCCESS;
   }
 
-  virtual RC find_cell(const TupleCellSpec &spec, Value &cell) const override
+  virtual RC find_cell(const TupleCellSpec &spec, Value &cell, bool should_dif) const override
   {
 
     const int size = static_cast<int>(specs_.size());
     for (int i = 0; i < size; i++) {
-      if (specs_[i].equals(spec)) {
-        cell = cells_[i];
-        return RC::SUCCESS;
+      if (should_dif) [[unlikely]] {
+        if (specs_[i].equals(spec)) {
+          cell = cells_[i];
+          return RC::SUCCESS;
+        }
+      } else {
+        if (specs_[i].equals_no_alias(spec)) {
+          cell = cells_[i];
+          return RC::SUCCESS;
+        }
       }
     }
     return RC::NOTFOUND;
@@ -452,12 +480,22 @@ public:
     return RC::SUCCESS;
   }
 
-  RC set_schema(Table* table,span<const FieldMeta> fields)
+  RC set_schema(Table *table, span<const FieldMeta> fields)
   {
     cells_.resize(fields.size());
     specs_.reserve(fields.size());
-    for (auto & field : fields) {
+    for (auto &field : fields) {
       specs_.emplace_back(table->name(), field.name());
+    }
+    return RC::SUCCESS;
+  }
+
+  RC set_schema(Table *table, span<const FieldMeta> fields, const std::string &alias)
+  {
+    cells_.resize(fields.size());
+    specs_.reserve(fields.size());
+    for (auto &field : fields) {
+      specs_.emplace_back(table->name(), field.name(), alias.c_str());
     }
     return RC::SUCCESS;
   }
@@ -568,14 +606,14 @@ public:
     return RC::NOTFOUND;
   }
 
-  RC find_cell(const TupleCellSpec &spec, Value &value) const override
+  RC find_cell(const TupleCellSpec &spec, Value &value, bool should_dif) const override
   {
-    RC rc = left_->find_cell(spec, value);
-    if (rc == RC::SUCCESS || rc != RC::NOTFOUND) {
+    RC rc = left_->find_cell(spec, value, should_dif);
+    if (rc == RC::SUCCESS) {
       return rc;
     }
 
-    return right_->find_cell(spec, value);
+    return right_->find_cell(spec, value, should_dif);
   }
 
 private:

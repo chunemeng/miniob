@@ -392,12 +392,15 @@ public:
   const std::string &table_name() const { return field_.table_name(); }
   const std::string &field_name() const { return field_.field_name(); }
 
+  void set_alias(const std::string &alias) { alias_ = alias; }
+
   RC get_column(Chunk &chunk, Column &column) override;
 
   RC get_value(const Tuple &tuple, Value &value) const override;
 
 private:
-  Field field_;
+  Field       field_;
+  std::string alias_;
 };
 
 /**
