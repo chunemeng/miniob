@@ -213,7 +213,7 @@ RC ExpressionBinder::bind_unbound_field_expression(
     Field      field(table, field_meta);
     FieldExpr *field_expr = new FieldExpr(field);
 
-    field_expr->set_alias(alias);
+    field_expr->set_alias(alias.empty() ? context_.get_alias_back(table->table_meta().name_str()) : alias);
     if (unbound_field_expr->is_alias()) {
       field_expr->set_name(unbound_field_expr->name());
     } else if (should_alis) {

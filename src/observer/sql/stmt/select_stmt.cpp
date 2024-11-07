@@ -103,7 +103,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   for (auto &node : select_sql.inner_joins) {
     conditions.emplace_back(node.conditions);
 
-    const auto &table_name_r = node.table_name;
+    auto &table_name_r = node.table_name;
     if (table_name_r.relation_name.empty()) {
       LOG_WARN("invalid argument. relation name is null.");
       return RC::INVALID_ARGUMENT;
@@ -122,6 +122,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
       LOG_WARN("alias name already exists. alias=%s, table_name=%s", table_name_r.attribute_name.c_str(), table_name_r.relation_name.c_str());
       return RC::SCHEMA_ALIAS_NAME_REPEAT;
     }
+    binder_context.add_alias_ordered(std::move(table_name_r.attribute_name));
   }
 
   if (!conditions.empty()) {
@@ -231,7 +232,7 @@ RC SelectStmt::create(BinderContext &binder_context, SelectSqlNode &select_sql, 
   // collect tables in `from` statement
   vector<Table *> tables;
   for (size_t i = 0; i < select_sql.relations.size(); i++) {
-    const auto &table_name = select_sql.relations[i];
+    auto &table_name = select_sql.relations[i];
     if (table_name.relation_name.empty()) {
       LOG_WARN("invalid argument. relation name is null. index=%d", i);
       return RC::INVALID_ARGUMENT;
@@ -253,6 +254,7 @@ RC SelectStmt::create(BinderContext &binder_context, SelectSqlNode &select_sql, 
       }
       binder_context.add_alias_subquery(table_name.attribute_name, table_name.relation_name);
     }
+    binder_context.add_alias_ordered(std::move(table_name.attribute_name));
   }
 
   bool                                     should_alis = !select_sql.inner_joins.empty();
@@ -261,7 +263,7 @@ RC SelectStmt::create(BinderContext &binder_context, SelectSqlNode &select_sql, 
   for (auto &node : select_sql.inner_joins) {
     conditions.emplace_back(node.conditions);
 
-    const auto &table_name_r = node.table_name;
+    auto &table_name_r = node.table_name;
     if (table_name_r.relation_name.empty()) {
       LOG_WARN("invalid argument. relation name is null.");
       return RC::INVALID_ARGUMENT;
@@ -283,6 +285,7 @@ RC SelectStmt::create(BinderContext &binder_context, SelectSqlNode &select_sql, 
       }
       binder_context.add_alias_subquery(table_name_r.attribute_name, table_name_r.relation_name);
     }
+    binder_context.add_alias_ordered(std::move(table_name_r.attribute_name));
   }
 
   if (!conditions.empty()) {
@@ -339,16 +342,14 @@ RC SelectStmt::create(BinderContext &binder_context, SelectSqlNode &select_sql, 
   }
 
   // everything alright
-  SelectStmt              *select_stmt = new SelectStmt();
-  std::vector<std::string> alis_names;
-  alis_names.resize(binder_context.table_ordered().size(), {});
+  SelectStmt *select_stmt = new SelectStmt();
   select_stmt->tables_.swap(binder_context.table_ordered());
   select_stmt->query_expressions_.swap(bound_expressions);
   select_stmt->filter_stmt_ = filter_stmt;
   select_stmt->having_stmt_ = having_stmt;
   select_stmt->group_by_.swap(group_by_expressions);
   select_stmt->order_by_.swap(order_by_expressions);
-  select_stmt->alis_names_.swap(alis_names);
+  select_stmt->alis_names_.swap(binder_context.alias());
   stmt = select_stmt;
   return RC::SUCCESS;
 }

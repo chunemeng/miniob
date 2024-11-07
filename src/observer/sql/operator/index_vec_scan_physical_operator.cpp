@@ -32,7 +32,7 @@ RC IndexVecScanPhysicalOperator::open(Trx *trx)
     return RC::INTERNAL;
   }
 
-  tuple_.set_schema(table_, table_->table_meta().field_metas());
+  tuple_.set_schema(table_, table_->table_meta().field_metas(), table_->table_meta().name_str());
 
   trx_ = trx;
   return RC::SUCCESS;
